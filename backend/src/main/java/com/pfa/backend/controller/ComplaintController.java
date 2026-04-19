@@ -2,6 +2,8 @@ package com.pfa.backend.controller;
 
 import com.pfa.backend.dto.*;
 import com.pfa.backend.service.ComplaintService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,11 +16,12 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/complaints")
 @RequiredArgsConstructor
+@Tag(name = "Complaints", description = "Complaint lifecycle management")
 public class ComplaintController {
 
     private final ComplaintService complaintService;
 
-    // Citizen creates a complaint
+    @Operation(summary = "Create a new complaint", description = "Available to authenticated citizens")
     @PostMapping
     public ResponseEntity<ComplaintResponse> create(
             @RequestBody ComplaintCreateRequest request,
@@ -29,7 +32,7 @@ public class ComplaintController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // Citizen attaches an image to a complaint
+    @Operation(summary = "Attach an image to a complaint")
     @PostMapping("/{id}/attachments")
     public ResponseEntity<Void> uploadAttachment(
             @PathVariable UUID id,
@@ -40,7 +43,7 @@ public class ComplaintController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    // Admin assigns complaint to an agent  →  PENDING → ASSIGNED
+    @Operation(summary = "Assign complaint to agent", description = "Admin only. Transitions PENDING → ASSIGNED")
     @PutMapping("/{id}/assign")
     public ResponseEntity<ComplaintResponse> assign(
             @PathVariable UUID id,
@@ -51,7 +54,7 @@ public class ComplaintController {
                 complaintService.assignComplaint(id, request, userDetails.getUsername()));
     }
 
-    // Agent updates status  →  ASSIGNED → IN_PROGRESS → RESOLVED
+    @Operation(summary = "Update complaint status", description = "Agent only. ASSIGNED → IN_PROGRESS → RESOLVED")
     @PutMapping("/{id}/status")
     public ResponseEntity<ComplaintResponse> updateStatus(
             @PathVariable UUID id,

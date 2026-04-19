@@ -23,8 +23,13 @@ public class SecurityConfig {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/uploads/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         .requestMatchers("/api/complaints/*/assign").hasAuthority("ROLE_ADMIN")
                         .requestMatchers("/api/complaints/*/status").hasAuthority("ROLE_AGENT")
                         .requestMatchers("/api/complaints/**").authenticated()

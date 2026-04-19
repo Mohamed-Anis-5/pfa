@@ -1,0 +1,150 @@
+THIRD SPRINT REPORT
+Date: 2026-04-19
+
+Goal
+- Document new files added in this sprint.
+- Explain each file role.
+- Show relationships between new files and existing layers.
+
+1) New Files and Roles
+
+A) Configuration
+- src/main/java/com/pfa/backend/config/OpenApiConfig.java
+  Role: Defines OpenAPI metadata and JWT bearer security scheme for Swagger.
+
+B) Controllers
+- src/main/java/com/pfa/backend/controller/DashboardController.java
+  Role: Exposes dashboard endpoints for stats and geospatial nearby complaints.
+- src/main/java/com/pfa/backend/controller/FeedbackController.java
+  Role: Exposes endpoint to submit citizen feedback and close complaint.
+
+C) DTOs
+- src/main/java/com/pfa/backend/dto/DashboardStats.java
+  Role: API response model for aggregated dashboard statistics.
+- src/main/java/com/pfa/backend/dto/FeedbackRequest.java
+  Role: API request model for citizen rating/comment submission.
+- src/main/java/com/pfa/backend/dto/FeedbackResponse.java
+  Role: API response model returned after feedback creation.
+
+D) Entities
+- src/main/java/com/pfa/backend/entity/Feedback.java
+  Role: Persistence model for one feedback per complaint with rating/comment.
+- src/main/java/com/pfa/backend/entity/Notification.java
+  Role: Persistence model for user notifications (SLA alerts and related events).
+
+E) Repositories
+- src/main/java/com/pfa/backend/repository/FeedbackRepository.java
+  Role: Feedback data access (exists/find by complaint id).
+- src/main/java/com/pfa/backend/repository/NotificationRepository.java
+  Role: Notification data access (unread notifications per user).
+
+F) Services
+- src/main/java/com/pfa/backend/service/DashboardService.java
+  Role: Business logic for dashboard stats and geospatial search.
+- src/main/java/com/pfa/backend/service/FeedbackService.java
+  Role: Business logic for feedback submission, validation, and complaint closure.
+
+G) Scheduler
+- src/main/java/com/pfa/backend/scheduler/SlaMonitoringScheduler.java
+  Role: Daily scheduled job that detects overdue complaints, updates status to OVERDUE, and creates admin notifications.
+
+2) File Relationships (How They Connect)
+
+A) Swagger Documentation Flow
+- OpenApiConfig -> configures Swagger/OpenAPI.
+- SecurityConfig (existing, updated) -> permits /v3/api-docs and /swagger-ui routes.
+- AuthController, ComplaintController, DashboardController, FeedbackController -> annotated with OpenAPI tags/operations.
+
+B) Dashboard Flow
+- DashboardController -> DashboardService.
+- DashboardService -> ComplaintRepository.
+- ComplaintRepository -> custom queries:
+  - countByStatus()
+  - countByCategory()
+  - averageResolutionTimeHours()
+  - findWithinRadius(...)
+- DashboardService -> DashboardStats DTO.
+
+C) Feedback Flow
+- FeedbackController -> FeedbackService.
+- FeedbackService -> ComplaintRepository + CitizenRepository (existing) + FeedbackRepository.
+- FeedbackService -> Feedback entity persistence.
+- FeedbackService updates Complaint status lifecycle:
+  RESOLVED -> CLOSED after valid feedback.
+- FeedbackService returns FeedbackResponse DTO.
+
+D) SLA Monitoring Flow
+- SlaMonitoringScheduler (cron) -> ComplaintRepository.findOverdueComplaints(today).
+- For each overdue complaint:
+  - updates Complaint.status to OVERDUE
+  - saves with ComplaintRepository
+  - loads admins with UserRepository.findAllAdmins()
+  - creates Notification entities via NotificationRepository
+
+E) Data Model Relations Introduced
+- Feedback (new)
+  - OneToOne -> Complaint
+  - ManyToOne -> Citizen
+  - ManyToOne -> MunicipalAgent (ratedAgent)
+- Notification (new)
+  - ManyToOne -> User
+  - ManyToOne -> Complaint
+
+3) Layered Dependency Summary
+- Controllers depend on Services.
+- Services depend on Repositories.
+- Repositories depend on Entities and query definitions.
+- Scheduler depends on Service/Repository layer and writes to entities.
+- Config layer (OpenApiConfig/SecurityConfig) enables secured API docs and endpoint access policy.
+
+4) Notes
+- ComplaintStatus now includes OVERDUE to support SLA monitoring.
+- ComplaintRepository method names use inherited id path (citizenId, assignedAgentId) and are compatible with entity model.
+- averageResolutionTimeHours uses native SQL for PostgreSQL/Hibernate 7 compatibility.
+
+5) API Test Notes (Requested curl flow)
+
+Test context
+- Server target: http://localhost:8080
+- OpenAPI endpoint reachable: GET /v3/api-docs returned 200 in prior checks.
+
+Requested command #1 (Register)
+curl -X POST http://localhost:8080/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "Mohamed",
+    "lastName": "Anis",
+    "email": "anis@test.com",
+    "password": "pass123",
+    "phoneNumber": "21234567",
+    "identifiantUnique": "12345678901",
+    "role": "CITIZEN"
+  }'
+
+Observed result
+- With identifiantUnique=12345678901: request failed (data already exists in DB from previous runs).
+- Retest with identifiantUnique=12345678902: HTTP 200 OK.
+- Response body shape:
+  {"token":"<jwt>","email":"anis@test.com","role":"ROLE_CITIZEN"}
+
+Requested command #2 (Login)
+curl -X POST http://localhost:8080/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "anis@test.com",
+    "password": "pass123"
+  }'
+
+Observed result
+- HTTP 200 OK.
+- Response body shape:
+  {"token":"<jwt>","email":"anis@test.com","role":"ROLE_CITIZEN"}
+
+Requested command #3 (GET complaints)
+curl -X GET http://localhost:8080/api/complaints \
+  -H "Authorization: Bearer <jwt>"
+
+Observed result
+- HTTP 403 Forbidden.
+- In server logs, GET method on /api/complaints is not supported by current controller mappings (warnings for HttpRequestMethodNotSupportedException).
+- Current complaint creation endpoint is POST /api/complaints and requires authenticated citizen context plus valid payload.
