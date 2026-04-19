@@ -5,6 +5,8 @@ import com.pfa.backend.enums.Priority;
 import jakarta.persistence.*;
 import lombok.*;
 import org.locationtech.jts.geom.Point;
+
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -26,13 +28,12 @@ public class Complaint {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ComplaintStatus status = ComplaintStatus.PENDING;
+    private ComplaintStatus status;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Priority priority = Priority.Medium;
+    private Priority priority;
 
-    // PostGIS spatial point (SRID 4326 = WGS84 lat/lng)
     @Column(columnDefinition = "geometry(Point,4326)")
     private Point location;
 
@@ -51,6 +52,10 @@ public class Complaint {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "assigned_by_admin_id")
     private Administrator assignedByAdmin;
+
+    // Computed from category.slaDays at creation time
+    @Column(name = "target_date")
+    private LocalDate targetDate;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

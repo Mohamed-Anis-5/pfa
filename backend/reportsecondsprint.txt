@@ -1,0 +1,126 @@
+Second Sprint Report
+Date: 2026-04-19
+
+A) New Files and Changes: Roles and Relations
+
+1) README.md
+- Role: Main project usage guide.
+- Relation: Documents how to build, run, and test the backend for developers.
+
+2) report(file.txt)
+- Role: First architecture/change report.
+- Relation: Explains package/folder responsibilities and initial stabilization changes.
+
+3) reportsecondsprint.txt (this file)
+- Role: Second sprint consolidated report.
+- Relation: Adds test scenario documentation and current execution results.
+
+4) src/test/resources/application.properties
+- Role: Test-only Spring configuration.
+- Relation: Overrides main runtime datasource during tests so test behavior can differ from production/default profile.
+
+5) src/main/java/com/pfa/backend/service/AuthService.java
+- Role: Authentication business logic (register/login/JWT response).
+- Relation: Used by AuthController and integrates with UserRepository + security/authentication manager.
+- Important change: source file name corrected to lowercase .java (Linux case-sensitive compatibility).
+
+B) Folder/Layer Relations (Current)
+
+- controller layer
+  - AuthController, ComplaintController.
+  - Receives HTTP requests, delegates logic to service layer.
+
+- service layer
+  - AuthService, ComplaintService, UserDetailsServiceImpl, FileStorageService.
+  - Implements business rules.
+  - ComplaintService computes targetDate from category SLA and sets initial complaint status.
+
+- repository layer
+  - UserRepository, CategoryRepository, ComplaintRepository, CitizenRepository, etc.
+  - Database access (Spring Data JPA).
+
+- entity + dto + enums
+  - entity: persisted domain models.
+  - dto: API request/response payloads.
+  - enums: controlled domain constants (priority, status, etc.).
+
+- config + util
+  - Security/filter/JWT wiring.
+  - Request authorization and token parsing.
+
+C) Complaint Rule Verified in Code
+
+From complaint creation logic in service:
+- Initial status is set to PENDING.
+- targetDate is set to LocalDate.now() + category.slaDays.
+
+This directly matches your expected behavior:
+- status: PENDING
+- targetDate: today + 7 days when category SLA is 7.
+
+D) Requested Integration Test Scenario
+
+Requested steps:
+1) Insert category (Voirie, sla_days=7) in PostgreSQL container.
+2) Register citizen.
+3) Login and get JWT token.
+4) Create complaint using token.
+5) Expect status=PENDING and targetDate=today+7.
+
+E) Actual Execution Result in Current Environment
+
+1) Database seed command result:
+- Command used: docker exec -i municipal_db psql -U municipal_user -d municipal_db ...
+- Result: FAILED
+- Reason: No such container: municipal_db
+
+2) API flow execution result:
+- Could not run fully against requested PostgreSQL container because container is missing.
+- Therefore, full end-to-end verification of the exact command chain is currently blocked in this environment.
+
+3) Automated tests result (mvn test):
+- Tests run: 1
+- Failures: 0
+- Errors: 1
+- Root issue: unresolved placeholder ${file.upload-dir} during ApplicationContext startup.
+
+F) Conclusion
+
+- Functional rule for complaint creation is correctly implemented in code:
+  - status -> PENDING
+  - targetDate -> today + slaDays (7 in your test).
+- Your exact integration test command chain is blocked until municipal_db Docker container exists/runs.
+- Current test suite also needs configuration fix for file.upload-dir to pass contextLoads.
+
+G) To Run Your Test Successfully (Prerequisites)
+
+1) Start/ensure container name is exactly municipal_db.
+2) Ensure application runs with the same PostgreSQL connection credentials.
+3) Ensure required app property file.upload-dir is defined for runtime/tests.
+4) Re-run your 4 test commands in sequence.
+
+H) BUILD SUCCESS — Docker + Test Resolution (2026-04-19 16:01)
+
+All blockers were resolved in sequence:
+
+1) Docker container conflict:
+   - A stopped container named municipal_db (bd676e4bf225) was found already running
+     with image postgis/postgis:16-3.4 (locally available).
+   - docker-compose.yml was updated to use postgis/postgis:16-3.4 to match the existing container.
+   - Verified: docker exec -i municipal_db psql -U municipal_user -d municipal_db
+                -> PostgreSQL 16.4 responding, database=municipal_db, user=municipal_user.
+
+2) Test configuration fixed (src/test/resources/application.properties):
+   - Replaced H2 driver (not in classpath) with PostgreSQL driver matching the running container.
+   - Added missing property: file.upload-dir=/tmp/uploads
+   - Updated dialect from H2Dialect to PostgreSQLDialect.
+
+3) Repository method name corrected (ComplaintRepository.java):
+   - findByCitizenUserId(Long) -> findByCitizenId(Long)
+   - findByAssignedAgentUserId(Long) -> findByAssignedAgentId(Long)
+   - Root cause: Citizen inherits field 'id' from User; there is no 'userId' field.
+
+4) Final mvn test result:
+   - Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+   - BUILD SUCCESS
+   - Total time: 8.616 s (2026-04-19T16:01:11+01:00)

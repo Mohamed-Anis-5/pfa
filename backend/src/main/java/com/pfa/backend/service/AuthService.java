@@ -2,6 +2,7 @@ package com.pfa.backend.service;
 
 import com.pfa.backend.dto.*;
 import com.pfa.backend.entity.*;
+import com.pfa.backend.enums.UserRole;
 import com.pfa.backend.repository.UserRepository;
 import com.pfa.backend.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +24,13 @@ public class AuthService {
             throw new RuntimeException("Email already in use");
         }
 
+        UserRole role = switch (request.getRole().toUpperCase()) {
+            case "CITIZEN" -> UserRole.ROLE_CITIZEN;
+            case "AGENT"   -> UserRole.ROLE_AGENT;
+            case "ADMIN"   -> UserRole.ROLE_ADMIN;
+            default        -> throw new RuntimeException("Unknown role: " + request.getRole());
+        };
+
         User user = switch (request.getRole().toUpperCase()) {
             case "CITIZEN" -> new Citizen();
             case "AGENT"   -> new MunicipalAgent();
@@ -36,28 +44,23 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPhoneNumber(request.getPhoneNumber());
         user.setIdentifiantUnique(request.getIdentifiantUnique());
+        user.setRole(role);
 
         userRepository.save(user);
 
         String token = jwtUtil.generateToken(user.getEmail());
-        return new AuthResponse(token, user.getEmail(), request.getRole().toUpperCase());
+        return new AuthResponse(token, user.getEmail(), role.name());
     }
 
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
         );
+
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        String role = switch (user) {
-            case Citizen c         -> "CITIZEN";
-            case MunicipalAgent a  -> "AGENT";
-            case Administrator ad  -> "ADMIN";
-            default                -> "USER";
-        };
-
         String token = jwtUtil.generateToken(user.getEmail());
-        return new AuthResponse(token, user.getEmail(), role);
+        return new AuthResponse(token, user.getEmail(), user.getRole().name());
     }
 }

@@ -1,5 +1,6 @@
 package com.pfa.backend.entity;
 
+import com.pfa.backend.enums.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.OffsetDateTime;
@@ -32,6 +33,10 @@ public class User {
 
     @Column(name = "identifiant_unique", unique = true, length = 11)
     private String identifiantUnique;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UserRole role;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
