@@ -4,7 +4,6 @@ import com.pfa.backend.enums.ComplaintStatus;
 import com.pfa.backend.enums.Priority;
 import jakarta.persistence.*;
 import lombok.*;
-import org.locationtech.jts.geom.Point;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -34,8 +33,11 @@ public class Complaint {
     @Column(nullable = false)
     private Priority priority;
 
-    @Column(columnDefinition = "geometry(Point,4326)")
-    private Point location;
+    @Column
+    private Double latitude;
+
+    @Column
+    private Double longitude;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)

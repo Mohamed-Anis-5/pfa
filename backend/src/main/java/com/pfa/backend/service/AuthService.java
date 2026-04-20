@@ -3,12 +3,21 @@ package com.pfa.backend.service;
 import com.pfa.backend.dto.*;
 import com.pfa.backend.entity.*;
 import com.pfa.backend.enums.UserRole;
+import com.pfa.backend.enums.Governorate;
+import com.pfa.backend.enums.ServiceType;
+import com.pfa.backend.enums.Grade;
 import com.pfa.backend.repository.UserRepository;
 import com.pfa.backend.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.*;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.CONFLICT;
+import static org.springframework.http.HttpStatus.UNAUTHORIZED;
 
 @Service
 @RequiredArgsConstructor
@@ -21,21 +30,21 @@ public class AuthService {
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already in use");
+            throw new ResponseStatusException(CONFLICT, "Email already in use");
         }
 
         UserRole role = switch (request.getRole().toUpperCase()) {
             case "CITIZEN" -> UserRole.ROLE_CITIZEN;
             case "AGENT"   -> UserRole.ROLE_AGENT;
             case "ADMIN"   -> UserRole.ROLE_ADMIN;
-            default        -> throw new RuntimeException("Unknown role: " + request.getRole());
+            default        -> throw new ResponseStatusException(BAD_REQUEST, "Unknown role: " + request.getRole());
         };
 
         User user = switch (request.getRole().toUpperCase()) {
             case "CITIZEN" -> new Citizen();
             case "AGENT"   -> new MunicipalAgent();
             case "ADMIN"   -> new Administrator();
-            default        -> throw new RuntimeException("Unknown role: " + request.getRole());
+            default        -> throw new ResponseStatusException(BAD_REQUEST, "Unknown role: " + request.getRole());
         };
 
         user.setFirstName(request.getFirstName());
@@ -43,8 +52,21 @@ public class AuthService {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPhoneNumber(request.getPhoneNumber());
-        user.setIdentifiantUnique(request.getIdentifiantUnique());
         user.setRole(role);
+
+        if (user instanceof Citizen citizen) {
+            citizen.setIdentifiantUnique(request.getIdentifiantUnique());
+            citizen.setNumCin(request.getNumCin());
+            citizen.setAddress(request.getAddress());
+            citizen.setGovernorate(request.getGovernorate() != null ? 
+                Governorate.valueOf(request.getGovernorate().toUpperCase()) : null);
+            citizen.setDateOfBirth(request.getDateOfBirth());
+        } else if (user instanceof MunicipalAgent agent) {
+            agent.setMatricule(request.getMatricule());
+            agent.setServiceType(request.getServiceType() != null ? ServiceType.valueOf(request.getServiceType().toUpperCase()) : null);
+            agent.setArrondissement(request.getArrondissement());
+            agent.setGrade(request.getGrade() != null ? Grade.valueOf(request.getGrade().toUpperCase()) : null);
+        }
 
         userRepository.save(user);
 
@@ -53,12 +75,16 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
+        try {
+            authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+            );
+        } catch (AuthenticationException ex) {
+            throw new ResponseStatusException(UNAUTHORIZED, "Invalid email or password");
+        }
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new ResponseStatusException(UNAUTHORIZED, "Invalid email or password"));
 
         String token = jwtUtil.generateToken(user.getEmail());
         return new AuthResponse(token, user.getEmail(), user.getRole().name());

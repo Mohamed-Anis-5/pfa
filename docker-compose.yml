@@ -1,9 +1,6 @@
-version: '3.8'
-
 services:
   db:
     image: postgis/postgis:16-3.4
-    container_name: municipal_db
     environment:
       POSTGRES_DB: municipal_db
       POSTGRES_USER: municipal_user

@@ -5,7 +5,6 @@ public enum ComplaintStatus {
     VALIDATED,
     ASSIGNED,
     IN_PROGRESS,
-    OVERDUE,
     RESOLVED,
     ARCHIVED,
     CLOSED,

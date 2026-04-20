@@ -14,6 +14,9 @@ public class Citizen extends User {
     @Column(name = "num_cin", unique = true, length = 8)
     private String numCin;
 
+    @Column(name = "identifiant_unique", unique = true, length = 11)
+    private String identifiantUnique;
+
     @Column(name = "address", columnDefinition = "TEXT")
     private String address;
 

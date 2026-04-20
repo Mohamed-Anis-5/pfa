@@ -44,9 +44,10 @@ public interface ComplaintRepository extends JpaRepository<Complaint, UUID> {
     // Geospatial: complaints within radiusMeters of a given point
     @Query(value = """
         SELECT * FROM complaints c
-        WHERE c.location IS NOT NULL
+        WHERE c.latitude IS NOT NULL
+        AND c.longitude IS NOT NULL
         AND ST_DWithin(
-            c.location::geography,
+            ST_SetSRID(ST_MakePoint(c.longitude, c.latitude), 4326)::geography,
             ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
             :radiusMeters
         )

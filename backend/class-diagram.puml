@@ -1,0 +1,252 @@
+@startuml Diagramme de Classe - Système de Gestion des Réclamations Municipales
+
+' =====================
+' STYLING
+' =====================
+skinparam classAttributeIconSize 0
+skinparam classFontStyle Bold
+skinparam classFontSize 13
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+
+skinparam class {
+    BackgroundColor #EEF2FF
+    BorderColor #4338CA
+    HeaderBackgroundColor #4338CA
+    HeaderFontColor #FFFFFF
+    FontColor #1E1B4B
+}
+
+skinparam enum {
+    BackgroundColor #FEF9C3
+    BorderColor #CA8A04
+    HeaderBackgroundColor #CA8A04
+    HeaderFontColor #FFFFFF
+}
+
+skinparam abstract {
+    BackgroundColor #F0FDF4
+    BorderColor #16A34A
+    HeaderBackgroundColor #16A34A
+    HeaderFontColor #FFFFFF
+}
+
+skinparam arrow {
+    Color #374151
+    FontColor #374151
+    FontSize 11
+}
+
+skinparam stereotypeCBackgroundColor #DBEAFE
+skinparam stereotypeIBackgroundColor #FCE7F3
+
+hide empty members
+
+' =====================
+' ENUMERATIONS
+' =====================
+
+enum Governorate {
+    TUNIS
+    ARIANA
+    BEN_AROUS
+    MANOUBA
+    NABEUL
+    ZAGHOUAN
+    BIZERTE
+    BEJA
+    JENDOUBA
+    LE_KEF
+    SILIANA
+    SOUSSE
+    MONASTIR
+    MAHDIA
+    SFAX
+    KAIROUAN
+    KASSERINE
+    SIDI_BOUZID
+    GABES
+    MEDENINE
+    TATAOUINE
+    GAFSA
+    TOZEUR
+    KEBILI
+}
+
+enum Grade {
+    Cat_A
+    Cat_B
+    Cat_C
+}
+
+enum ServiceType {
+    Voirie
+    Eclairage
+    Assainissement
+    Espaces_Verts
+}
+
+enum ComplaintStatus {
+    PENDING
+    VALIDATED
+    ASSIGNED
+    IN_PROGRESS
+    RESOLVED
+    ARCHIVED
+    CLOSED
+    REJECTED
+    CANCELLED
+}
+
+enum Priority {
+    Low
+    Medium
+    High
+    Emergency
+}
+
+' =====================
+' HIÉRARCHIE UTILISATEUR
+' =====================
+
+abstract class User <<abstract>> {
+    - id : Long
+    - firstName : String
+    - lastName : String
+    - email : String {unique}
+    - password : String {chiffré}
+    - phoneNumber : String
+}
+
+class Citizen {
+    - numCIN : String {8 chiffres}
+    - identifiantUnique : String {11 chiffres}
+    - address : String
+    - governorate : Governorate
+    - dateOfBirth : Date
+    --
+    + submitComplaint() : void
+    + viewComplaintHistory() : List<Complaint>
+    + rateService() : void
+}
+
+class MunicipalAgent {
+    - matricule : String
+    - grade : Grade
+    - serviceType : ServiceType
+    - arrondissement : String
+    --
+    + updateTaskStatus() : void
+    + addTechnicalNote() : void
+    + uploadResolutionPhoto() : void
+}
+
+class Administrator {
+    - roleLevel : String
+    - canValidateBudget : Boolean
+    --
+    + assignComplaint() : void
+    + manageCategories() : void
+    + generateReports() : void
+}
+
+' =====================
+' CLASSES PRINCIPALES
+' =====================
+
+class Complaint {
+    - complaintId : UUID
+    - title : String
+    - description : Text
+    - status : ComplaintStatus
+    - latitude : Double
+    - longitude : Double
+    - createdAt : Timestamp
+    - updatedAt : Timestamp
+    - priority : Priority
+}
+
+class Category {
+    - id : Integer
+    - label : String
+    - slaDays : Integer
+}
+
+class Feedback {
+    - id : Long
+    - rating : Integer {1..5}
+    - comment : Text
+    - submittedAt : Timestamp
+}
+
+class Attachment {
+    - id : Long
+    - fileUrl : String
+    - uploadedAt : Timestamp
+}
+
+' =====================
+' HÉRITAGE
+' =====================
+
+User <|-- Citizen
+User <|-- MunicipalAgent
+User <|-- Administrator
+
+' =====================
+' ASSOCIATIONS
+' =====================
+
+Citizen "1" --o "0..*" Complaint : soumet >
+MunicipalAgent "1" --o "0..*" Complaint : gère / traite >
+Administrator "1" ..> "0..*" Complaint : assigne >
+
+Complaint "0..*" --> "1" Category : appartient à >
+Complaint "1" --o "0..1" Feedback : reçoit >
+Complaint "1" --o "0..*" Attachment : contient >
+
+Citizen "1" --o "0..*" Feedback : soumet >
+Feedback "0..*" ..> "0..1" MunicipalAgent : évalue >
+
+' =====================
+' DÉPENDANCES ENUM
+' =====================
+
+Citizen ..> Governorate
+MunicipalAgent ..> Grade
+MunicipalAgent ..> ServiceType
+Complaint ..> ComplaintStatus
+Complaint ..> Priority
+
+' =====================
+' NOTES
+' =====================
+
+note top of User
+  Classe abstraite — ne peut pas
+  être instanciée directement.
+  Tous les utilisateurs héritent
+  de cette classe.
+end note
+
+note right of Citizen
+  numCIN validée contre
+  les bases nationales.
+  IU conforme à la stratégie
+  Tunisie Digitale.
+end note
+
+note bottom of Complaint
+  complaintId en UUID garantit
+  l'unicité distribuée.
+  latitude/longitude permettent
+  la géolocalisation sur carte.
+end note
+
+note right of Category
+  slaDays : délai maximum
+  de résolution (SLA) selon
+  le type de réclamation.
+end note
+
+@enduml

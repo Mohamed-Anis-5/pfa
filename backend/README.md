@@ -56,6 +56,40 @@ mvn test
 
 Tests use H2 via src/test/resources/application.properties.
 
+## Preloaded Demo Data
+
+The backend now includes an automatic startup seeder
+(`src/main/java/com/pfa/backend/config/DataSeeder.java`).
+
+When the app starts, it ensures baseline data exists:
+- Categories: Voirie, Eclairage public, Assainissement, Espaces verts
+- Users:
+  - Admin: admin.demo@municipalite.tn / Admin@123
+  - Agent: agent.demo@municipalite.tn / Agent@123
+  - Citizen: citizen.demo@municipalite.tn / Citizen@123
+- One starter complaint linked to the demo citizen
+
+To disable seeding explicitly:
+```bash
+mvn spring-boot:run -Dspring-boot.run.arguments="--app.seed.enabled=false"
+```
+
+## Demo Rehearsal Script
+
+Use the script below to rehearse the full workflow repeatedly:
+
+```bash
+chmod +x scripts/rehearse_demo.sh
+REHEARSALS=3 ./scripts/rehearse_demo.sh
+```
+
+What it validates in each run:
+- Login for citizen, admin, and agent
+- Complaint creation by citizen
+- Assignment by admin
+- Status transitions by agent (IN_PROGRESS -> RESOLVED)
+- Feedback submission by citizen (RESOLVED -> CLOSED)
+
 ## API Smoke Test (Auth)
 
 ### Register citizen

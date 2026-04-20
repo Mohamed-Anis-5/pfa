@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Leaflet fix */
+@import "leaflet/dist/leaflet.css";

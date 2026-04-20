@@ -10,7 +10,7 @@ import java.time.OffsetDateTime;
 @Inheritance(strategy = InheritanceType.JOINED)
 @DiscriminatorColumn(name = "user_type", discriminatorType = DiscriminatorType.STRING)
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
-public class User {
+public abstract class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,9 +30,6 @@ public class User {
 
     @Column(name = "phone_number", length = 20)
     private String phoneNumber;
-
-    @Column(name = "identifiant_unique", unique = true, length = 11)
-    private String identifiantUnique;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

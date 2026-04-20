@@ -2,6 +2,7 @@ package com.pfa.backend.config;
 
 import com.pfa.backend.service.UserDetailsServiceImpl;
 import com.pfa.backend.util.JwtUtil;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +36,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        String email = jwtUtil.extractEmail(token);
+        String email;
+        try {
+            email = jwtUtil.extractEmail(token);
+        } catch (JwtException | IllegalArgumentException ex) {
+            // Ignore malformed/expired token and continue without authentication.
+            chain.doFilter(request, response);
+            return;
+        }
 
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);

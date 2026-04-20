@@ -10,7 +10,7 @@ import lombok.*;
 public class Administrator extends User {
 
     @Column(name = "role_level", nullable = false, length = 50)
-    private String roleLevel;
+    private String roleLevel = "STANDARD";
 
     @Column(name = "can_validate_budget", nullable = false)
     private Boolean canValidateBudget = false;

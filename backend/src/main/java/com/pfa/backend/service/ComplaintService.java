@@ -7,13 +7,13 @@ import com.pfa.backend.enums.Priority;
 import com.pfa.backend.exception.*;
 import com.pfa.backend.repository.*;
 import lombok.RequiredArgsConstructor;
-import org.locationtech.jts.geom.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -26,8 +26,6 @@ public class ComplaintService {
     private final MunicipalAgentRepository agentRepository;
     private final AttachmentRepository   attachmentRepository;
     private final FileStorageService     fileStorageService;
-
-    private static final GeometryFactory GEO_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
 
     // -------------------------------------------------------
     // 1.1 + 1.2 + 1.3 — Create complaint
@@ -43,13 +41,6 @@ public class ComplaintService {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
 
-        // Build JTS Point from lat/lng (PostGIS SRID 4326)
-        Point location = null;
-        if (request.getLatitude() != null && request.getLongitude() != null) {
-            Coordinate coord = new Coordinate(request.getLongitude(), request.getLatitude());
-            location = GEO_FACTORY.createPoint(coord);
-        }
-
         // Compute SLA target date
         LocalDate targetDate = LocalDate.now().plusDays(category.getSlaDays());
 
@@ -58,7 +49,8 @@ public class ComplaintService {
                 .description(request.getDescription())
                 .status(ComplaintStatus.PENDING)
                 .priority(request.getPriority() != null ? request.getPriority() : Priority.Medium)
-                .location(location)
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
                 .category(category)
                 .citizen(citizen)
                 .targetDate(targetDate)
@@ -150,20 +142,14 @@ public class ComplaintService {
     }
 
     private ComplaintResponse toResponse(Complaint c) {
-        Double lat = null, lng = null;
-        if (c.getLocation() != null) {
-            lat = c.getLocation().getY(); // Y = latitude
-            lng = c.getLocation().getX(); // X = longitude
-        }
-
         return ComplaintResponse.builder()
                 .complaintId(c.getComplaintId())
                 .title(c.getTitle())
                 .description(c.getDescription())
                 .status(c.getStatus())
                 .priority(c.getPriority())
-                .latitude(lat)
-                .longitude(lng)
+                .latitude(c.getLatitude())
+                .longitude(c.getLongitude())
                 .categoryLabel(c.getCategory().getLabel())
                 .slaDays(c.getCategory().getSlaDays())
                 .targetDate(c.getTargetDate())
@@ -174,4 +160,22 @@ public class ComplaintService {
                 .updatedAt(c.getUpdatedAt())
                 .build();
     }
+
+    public List<ComplaintResponse> getAllComplaints() {
+    return complaintRepository.findAll().stream().map(this::toResponse).toList();
+}
+
+public List<ComplaintResponse> getComplaintsForCitizen(String email) {
+    Citizen citizen = citizenRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Citizen not found"));
+    return complaintRepository.findByCitizenId(citizen.getId())
+            .stream().map(this::toResponse).toList();
+}
+
+public List<ComplaintResponse> getComplaintsForAgent(String email) {
+    return complaintRepository.findAll().stream()
+            .filter(c -> c.getAssignedAgent() != null &&
+                         c.getAssignedAgent().getEmail().equals(email))
+            .map(this::toResponse).toList();
+}
 }

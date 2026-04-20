@@ -1,7 +1,6 @@
 package com.pfa.backend.repository;
 
 import com.pfa.backend.entity.User;
-import com.pfa.backend.enums.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 

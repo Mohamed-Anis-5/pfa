@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -64,4 +65,24 @@ public class ComplaintController {
         return ResponseEntity.ok(
                 complaintService.updateStatus(id, request, userDetails.getUsername()));
     }
+
+    // For citizen: get their own complaints
+@GetMapping("/my")
+public ResponseEntity<List<ComplaintResponse>> getMine(
+        @AuthenticationPrincipal UserDetails userDetails) {
+    return ResponseEntity.ok(complaintService.getComplaintsForCitizen(userDetails.getUsername()));
+}
+
+// For agent: get their assigned complaints
+@GetMapping("/assigned")
+public ResponseEntity<List<ComplaintResponse>> getAssigned(
+        @AuthenticationPrincipal UserDetails userDetails) {
+    return ResponseEntity.ok(complaintService.getComplaintsForAgent(userDetails.getUsername()));
+}
+
+// Admin: get all
+@GetMapping
+public ResponseEntity<List<ComplaintResponse>> getAll() {
+    return ResponseEntity.ok(complaintService.getAllComplaints());
+}
 }

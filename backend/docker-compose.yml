@@ -1,7 +1,6 @@
 services:
   db:
     image: postgis/postgis:16-3.4
-    container_name: municipal_db
     restart: unless-stopped
     environment:
       POSTGRES_DB: municipal_db
