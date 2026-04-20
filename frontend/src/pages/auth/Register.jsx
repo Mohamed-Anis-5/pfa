@@ -35,14 +35,16 @@ export default function Register() {
     }
   };
 
-  const field = (label, key, type = "text") => (
+  const field = (label, key, type = "text", options = {}) => (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       <input
-        type={type} required
+        type={type}
+        required
         className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
         value={form[key]}
         onChange={e => setForm({ ...form, [key]: e.target.value })}
+        {...options}
       />
     </div>
   );
@@ -57,10 +59,22 @@ export default function Register() {
             {field("Last Name",  "lastName")}
           </div>
           {field("Email", "email", "email")}
-          {field("Password", "password", "password")}
-          {field("Phone Number", "phoneNumber")}
+          {field("Password", "password", "password", { minLength: 8, title: "Password must be at least 8 characters" })}
+          {field("Phone Number", "phoneNumber", "text", {
+            inputMode: "numeric",
+            pattern: "[0-9]{8}",
+            minLength: 8,
+            maxLength: 8,
+            title: "Phone number must contain exactly 8 digits"
+          })}
 
-          {form.role === "CITIZEN" && field("Identifiant Unique (11 digits)", "identifiantUnique")}
+          {form.role === "CITIZEN" && field("Identifiant Unique (11 digits)", "identifiantUnique", "text", {
+            inputMode: "numeric",
+            pattern: "[0-9]{11}",
+            minLength: 11,
+            maxLength: 11,
+            title: "Identifiant unique must contain exactly 11 digits"
+          })}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>

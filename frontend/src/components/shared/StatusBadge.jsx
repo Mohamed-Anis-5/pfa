@@ -4,6 +4,7 @@ const colors = {
   ASSIGNED:    "bg-purple-100 text-purple-800",
   IN_PROGRESS: "bg-orange-100 text-orange-800",
   RESOLVED:    "bg-green-100 text-green-800",
+  OVERDUE:     "bg-rose-100 text-rose-800",
   ARCHIVED:    "bg-amber-100 text-amber-800",
   CLOSED:      "bg-gray-100 text-gray-800",
   REJECTED:    "bg-red-200 text-red-900",

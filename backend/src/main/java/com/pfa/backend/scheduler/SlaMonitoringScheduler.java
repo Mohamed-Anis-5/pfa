@@ -41,8 +41,8 @@ public class SlaMonitoringScheduler {
 
         for (Complaint complaint : overdueComplaints) {
 
-            // Mark as ARCHIVED when SLA is exceeded
-            complaint.setStatus(ComplaintStatus.ARCHIVED);
+            // Mark as OVERDUE when SLA deadline is exceeded
+            complaint.setStatus(ComplaintStatus.OVERDUE);
             complaint.setUpdatedAt(OffsetDateTime.now());
             complaintRepository.save(complaint);
 
@@ -69,6 +69,6 @@ public class SlaMonitoringScheduler {
             }
         }
 
-        log.info("[SLA Monitor] Flagged {} complaints as ARCHIVED.", overdueComplaints.size());
+        log.info("[SLA Monitor] Flagged {} complaints as OVERDUE.", overdueComplaints.size());
     }
 }

@@ -43,7 +43,7 @@ export default function AdminDashboard() {
             value={filters.status}
             onChange={e => setFilters({ ...filters, status: e.target.value })}>
             <option value="">All Statuses</option>
-            {["PENDING","VALIDATED","ASSIGNED","IN_PROGRESS","RESOLVED","ARCHIVED","CLOSED","REJECTED","CANCELLED"].map(s => (
+            {["PENDING","VALIDATED","ASSIGNED","IN_PROGRESS","RESOLVED","OVERDUE","ARCHIVED","CLOSED","REJECTED","CANCELLED"].map(s => (
               <option key={s}>{s}</option>
             ))}
           </select>

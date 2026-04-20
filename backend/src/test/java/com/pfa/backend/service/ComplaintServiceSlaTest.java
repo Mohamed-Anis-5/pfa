@@ -1,0 +1,93 @@
+package com.pfa.backend.service;
+
+import com.pfa.backend.dto.ComplaintCreateRequest;
+import com.pfa.backend.dto.ComplaintResponse;
+import com.pfa.backend.entity.Category;
+import com.pfa.backend.entity.Citizen;
+import com.pfa.backend.entity.Complaint;
+import com.pfa.backend.enums.ComplaintStatus;
+import com.pfa.backend.enums.Priority;
+import com.pfa.backend.repository.AttachmentRepository;
+import com.pfa.backend.repository.CategoryRepository;
+import com.pfa.backend.repository.CitizenRepository;
+import com.pfa.backend.repository.ComplaintRepository;
+import com.pfa.backend.repository.MunicipalAgentRepository;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class ComplaintServiceSlaTest {
+
+    @Mock
+    private ComplaintRepository complaintRepository;
+
+    @Mock
+    private CategoryRepository categoryRepository;
+
+    @Mock
+    private CitizenRepository citizenRepository;
+
+    @Mock
+    private MunicipalAgentRepository agentRepository;
+
+    @Mock
+    private AttachmentRepository attachmentRepository;
+
+    @Mock
+    private FileStorageService fileStorageService;
+
+    @InjectMocks
+    private ComplaintService complaintService;
+
+    @Test
+    void createComplaintCalculatesSlaDeadlineUsingCategorySlaDays() {
+        ComplaintCreateRequest request = new ComplaintCreateRequest();
+        request.setTitle("Pothole near school");
+        request.setDescription("Deep pothole causing traffic risk");
+        request.setPriority(Priority.High);
+        request.setCategoryId(1);
+        request.setLatitude(36.80);
+        request.setLongitude(10.18);
+
+        Citizen citizen = new Citizen();
+        citizen.setId(11L);
+        citizen.setEmail("citizen.demo@municipalite.tn");
+
+        Category category = Category.builder()
+                .id(1)
+                .label("Voirie")
+                .slaDays(3)
+                .build();
+
+        when(citizenRepository.findByEmail("citizen.demo@municipalite.tn"))
+                .thenReturn(Optional.of(citizen));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(category));
+
+        ArgumentCaptor<Complaint> complaintCaptor = ArgumentCaptor.forClass(Complaint.class);
+        when(complaintRepository.save(complaintCaptor.capture())).thenAnswer(invocation -> {
+            Complaint complaint = invocation.getArgument(0);
+            complaint.setComplaintId(UUID.randomUUID());
+            return complaint;
+        });
+
+        ComplaintResponse response = complaintService.createComplaint(request, "citizen.demo@municipalite.tn");
+
+        Complaint savedComplaint = complaintCaptor.getValue();
+        assertEquals(ComplaintStatus.PENDING, savedComplaint.getStatus());
+        assertEquals(LocalDate.now().plusDays(3), savedComplaint.getTargetDate());
+        assertEquals(LocalDate.now().plusDays(3), response.getTargetDate());
+        assertEquals("Voirie", response.getCategoryLabel());
+    }
+}
