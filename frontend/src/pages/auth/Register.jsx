@@ -13,7 +13,8 @@ export default function Register() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     firstName: "", lastName: "", email: "", password: "",
-    phoneNumber: "", identifiantUnique: "", role: "CITIZEN",
+    phoneNumber: "", numCin: "", identifiantUnique: "", role: "CITIZEN",
+    serviceType: "", grade: "", arrondissement: "",
   });
   const [error, setError] = useState("");
 
@@ -23,7 +24,11 @@ export default function Register() {
     try {
       const payload = {
         ...form,
-        identifiantUnique: form.role === "CITIZEN" ? form.identifiantUnique : null,
+        numCin: form.role === "CITIZEN" ? form.numCin : null,
+        identifiantUnique: form.role === "CITIZEN" ? (form.identifiantUnique || null) : null,
+        serviceType: form.role === "AGENT" ? form.serviceType : null,
+        grade: form.role === "AGENT" ? form.grade : null,
+        arrondissement: form.role === "AGENT" ? form.arrondissement : null,
       };
       await api.post("/auth/register", payload);
       navigate("/login");
@@ -35,19 +40,24 @@ export default function Register() {
     }
   };
 
-  const field = (label, key, type = "text", options = {}) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <input
-        type={type}
-        required
-        className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-        value={form[key]}
-        onChange={e => setForm({ ...form, [key]: e.target.value })}
-        {...options}
-      />
-    </div>
-  );
+  const field = (label, key, type = "text", options = {}) => {
+    const { required: isRequired = true, ...inputProps } = options;
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label}{!isRequired && <span className="text-gray-400 text-xs ml-1">(optional)</span>}
+        </label>
+        <input
+          type={type}
+          required={isRequired}
+          className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+          value={form[key]}
+          onChange={e => setForm({ ...form, [key]: e.target.value })}
+          {...inputProps}
+        />
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -68,13 +78,60 @@ export default function Register() {
             title: "Phone number must contain exactly 8 digits"
           })}
 
-          {form.role === "CITIZEN" && field("Identifiant Unique (11 digits)", "identifiantUnique", "text", {
-            inputMode: "numeric",
-            pattern: "[0-9]{11}",
-            minLength: 11,
-            maxLength: 11,
-            title: "Identifiant unique must contain exactly 11 digits"
-          })}
+          {form.role === "CITIZEN" && (
+            <>
+              {field("CIN Number (8 digits)", "numCin", "text", {
+                inputMode: "numeric",
+                pattern: "[0-9]{8}",
+                minLength: 8,
+                maxLength: 8,
+                title: "CIN must contain exactly 8 digits"
+              })}
+              {field("Identifiant Unique (11 digits)", "identifiantUnique", "text", {
+                required: false,
+                inputMode: "numeric",
+                pattern: "[0-9]{11}",
+                minLength: 11,
+                maxLength: 11,
+                title: "Identifiant unique must contain exactly 11 digits"
+              })}
+            </>
+          )}
+
+          {form.role === "AGENT" && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
+                <select
+                  required
+                  className="w-full border rounded-lg px-3 py-2"
+                  value={form.serviceType}
+                  onChange={e => setForm({ ...form, serviceType: e.target.value })}
+                >
+                  <option value="">Select service type</option>
+                  <option value="Voirie">Voirie</option>
+                  <option value="Eclairage">Eclairage</option>
+                  <option value="Assainissement">Assainissement</option>
+                  <option value="Espaces_Verts">Espaces Verts</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+                <select
+                  required
+                  className="w-full border rounded-lg px-3 py-2"
+                  value={form.grade}
+                  onChange={e => setForm({ ...form, grade: e.target.value })}
+                >
+                  <option value="">Select grade</option>
+                  <option value="Cat_A">Cat A</option>
+                  <option value="Cat_B">Cat B</option>
+                  <option value="Cat_C">Cat C</option>
+                </select>
+              </div>
+              {field("Arrondissement", "arrondissement")}
+            </>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>

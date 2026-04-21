@@ -1,0 +1,305 @@
+NON-FUNCTIONAL REQUIREMENTS — PROJECT ALIGNMENT AUDIT
+Municipal Complaint Management Platform
+Audit Date: April 21, 2026
+
+================================================================================
+5.1 SECURITY AND PRIVACY
+================================================================================
+
+AUTHENTICATION
+Status: IMPLEMENTED ✓
+- All API endpoints require a valid JWT Bearer token (stateless sessions).
+- Spring Security filter chain validates JWT on every request via JwtAuthFilter.
+- Tokens are signed with HS256, expire after 24h (jwt.expiration=86400000 ms).
+- Frontend Axios interceptor auto-redirects to /login on 401 or 403 responses.
+- Password minimum length (8 chars) enforced on the registration form (HTML5).
+
+AUTHORIZATION — ROLE-BASED ACCESS CONTROL (RBAC)
+Status: IMPLEMENTED ✓
+- Spring Security hasAuthority() rules enforce strict role separation:
+    ROLE_ADMIN only : PUT /api/complaints/*/assign
+    ROLE_AGENT only : PUT /api/complaints/*/status
+    Authenticated   : all other /api/complaints/** endpoints
+- Frontend ProtectedRoute component prevents cross-role page navigation.
+  Citizens cannot reach /admin or /agent routes; admins cannot reach /citizen.
+
+DATA ENCRYPTION — PASSWORDS
+Status: IMPLEMENTED ✓
+- BCryptPasswordEncoder (default work factor 10) hashes all passwords at
+  registration time. Raw passwords are never stored or logged anywhere.
+
+DATA ENCRYPTION AT REST (AES-256)
+Status: GAP — REQUIRES INFRASTRUCTURE CHANGE
+- PostgreSQL data resides on a Docker named volume (pgdata) with no
+  disk-level encryption configured.
+- Implementation gap: production deployment must use an encrypted filesystem
+  (dm-crypt/LUKS on the host) OR a managed database service that enables
+  transparent encryption at rest (e.g., AWS RDS, Azure Database for PostgreSQL).
+- The application itself cannot enforce this; it is an infrastructure concern.
+
+HTTPS / TLS IN TRANSIT
+Status: GAP — REQUIRES INFRASTRUCTURE CHANGE
+- The application currently runs on plain HTTP:
+    Backend  → http://localhost:8080
+    Frontend → http://localhost:5173 (nginx on port 80 inside Docker)
+- Production deployment must add a TLS-terminating reverse proxy (nginx with
+  Let's Encrypt certificates via Certbot) or place the app behind an HTTPS
+  load balancer.
+- CORS allowed origins must be updated to https:// schemes in production.
+- Recommended nginx configuration fragment:
+    server {
+        listen 443 ssl;
+        ssl_certificate /etc/letsencrypt/live/domain/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/domain/privkey.pem;
+        location /api/ { proxy_pass http://backend:8080/api/; }
+        location /     { proxy_pass http://frontend:80/;      }
+    }
+
+PRIVACY COMPLIANCE — GDPR / RIGHT TO ERASURE
+Status: IMPLEMENTED ✓
+- Account deletion endpoint added: DELETE /api/users/me
+  Anonymizes personal data (firstName → "Deleted", lastName → "User",
+  email → deleted-<uuid12>@anon.local, phoneNumber → null, password → [DELETED])
+  while preserving complaint records to maintain referential integrity and
+  audit trail — this satisfies GDPR's "right to be forgotten" via data erasure.
+- Endpoint is authenticated: only the logged-in user can delete their own account.
+
+PRIVACY COMPLIANCE — DATA PORTABILITY (Right to Access)
+Status: GAP — NOT IMPLEMENTED
+- No "download my data" endpoint exists.
+- Recommended: Add GET /api/users/me/export returning a JSON summary of the
+  user's profile, complaints filed, and feedback submitted.
+
+================================================================================
+5.2 PERFORMANCE AND SCALABILITY
+================================================================================
+
+RESPONSE TIME (< 2 seconds under normal conditions)
+Status: EXPECTED COMPLIANT — NOT BENCHMARKED
+- Spring Boot embedded Tomcat handles requests asynchronously using a thread pool.
+- PostgreSQL queries use indexed primary keys and JPA lazy-loading to minimize
+  data transferred per request.
+- PARTIAL GAP: Complaint list endpoints return all rows with no pagination.
+  For large datasets this degrades response time. Recommendation: add Spring
+  Data Pageable support to /api/complaints, /api/complaints/my, and
+  /api/complaints/assigned, e.g.:
+      Page<ComplaintResponse> getAllComplaints(Pageable pageable);
+
+CONCURRENCY (100+ concurrent users without degradation)
+Status: EXPECTED COMPLIANT — NOT LOAD-TESTED
+- Spring Boot default Tomcat max thread count is 200, sufficient for 100
+  concurrent users each holding one active request.
+- JWT stateless sessions eliminate server-side session contention entirely.
+- Recommendation: Conduct a load test with Apache JMeter or Gatling to verify
+  the 100-user threshold. If latency rises above 2s, tune:
+      server.tomcat.threads.max=300
+      server.tomcat.accept-count=200
+  in application.properties.
+
+IMAGE COMPRESSION (server-side, to reduce storage and load times)
+Status: IMPLEMENTED ✓
+- Thumbnailator 0.4.20 added to pom.xml.
+- FileStorageService now:
+    1. Validates that the uploaded file MIME type starts with "image/".
+       Non-image files are rejected with HTTP 400 Bad Request.
+    2. Compresses accepted images to a maximum width of 1200 pixels,
+       maintaining aspect ratio, at 85% JPEG quality.
+    3. Saves the result as a UUID-named .jpg file in the upload directory.
+- This significantly reduces storage footprint and improves image load times
+  for field agents viewing complaint photos on mobile connections.
+
+================================================================================
+5.3 AVAILABILITY AND RELIABILITY
+================================================================================
+
+AVAILABILITY (99.5% UPTIME TARGET)
+Status: BASIC RESILIENCE — INFRASTRUCTURE GAP FOR HIGH AVAILABILITY
+- Docker Compose uses restart: unless-stopped for all containers, providing
+  automatic restart after crashes or host reboots.
+- No clustering or multiple backend replicas are deployed.
+- Implementation gap: achieving 99.5% uptime requires:
+    - Docker Swarm or Kubernetes with at least 2 backend replicas and a
+      rolling-update strategy.
+    - A health-check probe (Spring Boot Actuator: GET /actuator/health) for
+      liveness and readiness in the orchestrator.
+    - A managed/replicated PostgreSQL instance (primary + read replica) to
+      eliminate the database as a single point of failure.
+
+DATA INTEGRITY (ACID PROPERTIES)
+Status: IMPLEMENTED ✓
+- PostgreSQL 16.4 with PostGIS provides full ACID guarantees at the database
+  level (Atomicity, Consistency, Isolation, Durability).
+- All multi-step business operations in the service layer are annotated with
+  @Transactional, ensuring rollback on any exception.
+- Hibernate ddl-auto=update safely evolves the schema across restarts without
+  losing data.
+
+FAULT TOLERANCE AND BACKUP
+Status: GAP — NO AUTOMATED BACKUP CONFIGURED
+- No backup schedule exists for the pgdata Docker volume.
+- Recommended cron job (add to host crontab):
+    0 2 * * * docker exec pfa-db-1 pg_dump -U municipal_user municipal_db \
+      | gzip > /backups/db_$(date +%F).sql.gz
+    # Retain 7 daily snapshots
+    find /backups -name "db_*.sql.gz" -mtime +7 -delete
+- Restore procedure: gunzip -c db_YYYY-MM-DD.sql.gz | docker exec -i pfa-db-1
+    psql -U municipal_user municipal_db
+
+ERROR HANDLING (user-friendly, no technical messages exposed)
+Status: IMPLEMENTED ✓
+- GlobalExceptionHandler (@RestControllerAdvice) maps all server exceptions
+  to a structured JSON body:
+      { "status": N, "error": "<HTTP reason phrase>", "message": "<description>" }
+- Handled exception types: ResponseStatusException, ResourceNotFoundException,
+  InvalidTransitionException, DataIntegrityViolationException, generic Exception.
+- Generic Exception handler logs the full stack trace server-side but returns
+  only "Internal server error" to the client — no stack traces exposed.
+- Frontend displays the extracted api.error.message field to users.
+
+================================================================================
+5.4 USABILITY (UX/UI)
+================================================================================
+
+ACCESSIBILITY (WCAG 2.1 Standards)
+Status: GAP — NOT AUDITED OR IMPLEMENTED
+- No explicit ARIA roles, aria-label, aria-describedby, or alt text attributes
+  have been added to React components.
+- Color contrast ratios have not been verified against WCAG AA minimum (4.5:1
+  for normal text, 3:1 for large text).
+- Keyboard navigation has not been verified for modal dialogs, dropdowns, or
+  interactive data tables.
+- Recommended actions:
+    1. Run Lighthouse or axe DevTools audit in Chrome DevTools.
+    2. Add aria-label to all icon-only buttons (e.g., notification bell, map pins).
+    3. Add role="alert" to error message paragraphs.
+    4. Add alt="" (empty string) to decorative images; descriptive alt to
+       complaint photos.
+    5. Verify focus rings are visible on all interactive elements (Tailwind's
+       focus:ring classes are partially present but need review).
+
+RESPONSIVENESS (Desktop / Tablet / Smartphone)
+Status: PARTIALLY IMPLEMENTED
+- Tailwind CSS utility classes with responsive breakpoints (sm: md: lg:) are
+  used throughout the application.
+- All pages use a min-h-screen layout with centered max-w containers.
+- PARTIAL GAP: The AdminDashboard complaint table and the Leaflet map component
+  have not been verified at small screen widths (< 640px). Wide tables may
+  overflow horizontally on mobile.
+- Recommended actions:
+    1. Test all views at 375px (iPhone SE), 768px (tablet), 1280px (desktop).
+    2. Wrap the complaint table in an overflow-x-auto container.
+    3. Add responsive height constraints to the Leaflet map component.
+
+MULTILINGUAL SUPPORT (Arabic, French, English)
+Status: GAP — NOT IMPLEMENTED
+- The UI is currently in French/English only. All labels, placeholders, error
+  messages, and status strings are hard-coded in the component files.
+- No i18n framework is integrated.
+- Recommended implementation plan:
+    1. Install react-i18next: npm install i18next react-i18next
+    2. Create translation files:
+         frontend/src/i18n/locales/fr.json
+         frontend/src/i18n/locales/en.json
+         frontend/src/i18n/locales/ar.json
+    3. Replace hard-coded strings with t('key') throughout components.
+    4. Add a language selector component to Navbar (flag icons or dropdown).
+    5. Enable RTL text direction for Arabic:
+         <html dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+       Tailwind supports RTL with the rtl: variant after enabling
+       'darkMode: false, future: { hoverOnlyWhenSupported: true }'
+       and adding rtl support in tailwind.config.js.
+
+================================================================================
+5.5 MAINTAINABILITY
+================================================================================
+
+MODULARITY
+Status: IMPLEMENTED ✓
+- Clear layered backend architecture:
+    controller → service → repository → entity
+- Separate Java packages per concern:
+    config, controller, dto, entity, enums, exception, repository,
+    scheduler, service, util
+- Independent modules: complaint management, user management, notifications,
+  feedback, SLA monitoring, dashboard analytics — each can be updated without
+  touching others.
+- Frontend follows feature-based structure:
+    pages/citizen, pages/admin, pages/agent, components/shared, components/map
+- Shared Axios instance and AuthContext centralize cross-cutting concerns.
+
+CODE QUALITY AND API DOCUMENTATION
+Status: IMPLEMENTED ✓
+- Swagger / OpenAPI 3.0 available at: http://localhost:8080/swagger-ui/index.html
+- All REST controllers annotated with @Tag (name, description) and @Operation
+  (summary, description) for complete API documentation.
+- Bearer Auth scheme configured in OpenApiConfig for authenticated Swagger requests.
+- Custom exception classes (ResourceNotFoundException, InvalidTransitionException)
+  with semantic HTTP status codes via @ResponseStatus.
+- Lombok @Data, @Builder, @RequiredArgsConstructor reduce boilerplate.
+- @Transactional annotations ensure consistent data operations.
+- SLA monitoring scheduled task documented with cron expression and log output.
+
+EXTENSIBILITY
+Status: IMPLEMENTED ✓
+- Spring Boot's dependency injection container allows adding new features as
+  independent beans with no changes to existing code.
+- New complaint categories → insert a row in the categories table (no code change).
+- Mobile application → consume the existing REST API endpoints with JWT Bearer
+  authentication (all endpoints are already stateless and JSON-based).
+- Analytics module → extend DashboardService and ComplaintRepository with new
+  @Query methods. Existing countByStatus, countByCategory, and
+  averageResolutionTimeHours queries demonstrate the extensibility pattern.
+- Future integrations (SMS gateway, email notifications) → add a new service
+  class and inject it into ComplaintService or SlaMonitoringScheduler.
+
+================================================================================
+SUMMARY — REQUIREMENTS COMPLIANCE TABLE
+================================================================================
+
+Requirement                          | Status           | Priority | Notes
+-------------------------------------|------------------|----------|-------------------------------
+Authentication (JWT, stateless)      | DONE ✓           | -        | JwtAuthFilter + BCrypt
+RBAC (role-based access control)     | DONE ✓           | -        | hasAuthority() + ProtectedRoute
+Password hashing (BCrypt)            | DONE ✓           | -        | PasswordEncoder bean
+HTTPS / TLS in transit               | GAP ✗            | HIGH     | Needs nginx + Let's Encrypt
+Disk encryption at rest (AES-256)    | GAP ✗            | HIGH     | Needs host-level dm-crypt/LUKS
+GDPR — account deletion              | DONE ✓           | -        | DELETE /api/users/me (anonymize)
+GDPR — data portability export       | GAP ✗            | MEDIUM   | Add GET /api/users/me/export
+Image compression (server-side)      | DONE ✓           | -        | Thumbnailator, max 1200px, 85%
+Response time < 2s                   | EXPECTED ✓       | MEDIUM   | Not load-tested; add pagination
+Concurrency 100+ users               | EXPECTED ✓       | MEDIUM   | Tomcat 200 threads; not tested
+Automated DB backups                 | GAP ✗            | HIGH     | Add host cron pg_dump
+99.5% uptime / high availability     | GAP ✗            | MEDIUM   | Needs Docker Swarm / Kubernetes
+ACID transactions                    | DONE ✓           | -        | PostgreSQL + @Transactional
+User-friendly error messages         | DONE ✓           | -        | GlobalExceptionHandler
+WCAG accessibility                   | GAP ✗            | MEDIUM   | ARIA audit needed
+Responsive design (desktop/tablet/   | PARTIAL ~        | MEDIUM   | Tailwind used; tables need fix
+  smartphone)                        |                  |          |
+Multilingual (Arabic/French/English) | GAP ✗            | HIGH     | Needs react-i18next integration
+Modular architecture                 | DONE ✓           | -        | Layered backend + feature pages
+API documentation (Swagger/OpenAPI)  | DONE ✓           | -        | /swagger-ui/index.html
+Extensibility                        | DONE ✓           | -        | DI + REST + extensible queries
+
+LEGEND: DONE ✓ = fully implemented | GAP ✗ = not implemented | PARTIAL ~ = partially done
+        EXPECTED ✓ = architectural support exists but not benchmarked
+
+================================================================================
+CHANGES MADE TO THE CODEBASE IN THIS SESSION
+================================================================================
+
+1. backend/pom.xml
+   - Added: net.coobird:thumbnailator:0.4.20 dependency for server-side image
+     compression.
+
+2. backend/src/main/java/com/pfa/backend/service/FileStorageService.java
+   - Added MIME type validation: only image/* content types accepted; others
+     rejected with HTTP 400 Bad Request.
+   - Added Thumbnailator compression pipeline: images saved at max 1200px
+     width, aspect-ratio preserved, 85% JPEG quality.
+   - All uploads are now stored as .jpg files regardless of input format.
+
+3. backend/src/main/java/com/pfa/backend/controller/UserController.java
+   - Added DELETE /api/users/me endpoint (GDPR Right to Erasure).
+   - Anonymizes firstName, lastName, email, phoneNumber, password of the
+     authenticated user's account. Complaint records are preserved to maintain
+     referential integrity and the audit trail required by the municipality.

@@ -6,13 +6,14 @@ import api from "../../api/axios";
 export default function AgentDashboard() {
   const [complaints, setComplaints] = useState([]);
   const [file, setFile] = useState({});
+  const [resolutionComment, setResolutionComment] = useState({});
 
   useEffect(() => {
     api.get("/complaints/assigned").then(r => setComplaints(r.data));
   }, []);
 
-  const updateStatus = async (id, newStatus) => {
-    await api.put(`/complaints/${id}/status`, { newStatus });
+  const updateStatus = async (id, newStatus, note) => {
+    await api.put(`/complaints/${id}/status`, { newStatus, note: note || null });
     const { data } = await api.get("/complaints/assigned");
     setComplaints(data);
   };
@@ -70,8 +71,15 @@ export default function AgentDashboard() {
                       Upload Photo
                     </button>
                   </div>
+                  <textarea
+                    placeholder="Resolution comment (optional)"
+                    rows={2}
+                    className="w-full border rounded px-3 py-2 text-sm resize-none"
+                    value={resolutionComment[c.complaintId] || ""}
+                    onChange={e => setResolutionComment({ ...resolutionComment, [c.complaintId]: e.target.value })}
+                  />
                   <button
-                    onClick={() => updateStatus(c.complaintId, "RESOLVED")}
+                    onClick={() => updateStatus(c.complaintId, "RESOLVED", resolutionComment[c.complaintId])}
                     className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition"
                   >
                     ✅ Mark as Resolved

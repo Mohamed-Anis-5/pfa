@@ -45,6 +45,22 @@ export default function MyComplaints() {
               {c.assignedAgentEmail && <span>👷 {c.assignedAgentEmail}</span>}
             </div>
 
+            {/* Resolution details — shown when resolved or closed */}
+            {(c.status === "RESOLVED" || c.status === "CLOSED") && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 space-y-1">
+                {c.resolvedAt && (
+                  <p className="text-xs text-green-700">
+                    ✅ Resolved on {new Date(c.resolvedAt).toLocaleDateString()}
+                  </p>
+                )}
+                {c.resolutionComment && (
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium">Resolution note: </span>{c.resolutionComment}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Rating interface — only for RESOLVED complaints */}
             {c.status === "RESOLVED" && ratingFor !== c.complaintId && (
               <button

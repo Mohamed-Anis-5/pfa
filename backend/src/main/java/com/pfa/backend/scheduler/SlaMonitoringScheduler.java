@@ -21,6 +21,7 @@ public class SlaMonitoringScheduler {
     private final ComplaintRepository    complaintRepository;
     private final NotificationRepository notificationRepository;
     private final UserRepository         userRepository;
+    private final ComplaintStatusHistoryRepository statusHistoryRepository;
 
     // Runs every day at 02:00 AM
     @Scheduled(cron = "0 0 2 * * ?")
@@ -41,12 +42,23 @@ public class SlaMonitoringScheduler {
 
         for (Complaint complaint : overdueComplaints) {
 
-            // Mark as OVERDUE when SLA deadline is exceeded
-            complaint.setStatus(ComplaintStatus.OVERDUE);
+            ComplaintStatus previousStatus = complaint.getStatus();
+
+            // Archive complaint when SLA deadline is exceeded
+            complaint.setStatus(ComplaintStatus.ARCHIVED);
+            complaint.setArchivedAt(OffsetDateTime.now());
             complaint.setUpdatedAt(OffsetDateTime.now());
             complaintRepository.save(complaint);
 
-            log.warn("[SLA Monitor] Complaint {} is overdue. Category: {}, Target: {}",
+            // Record history
+            statusHistoryRepository.save(ComplaintStatusHistory.builder()
+                    .complaint(complaint)
+                    .fromStatus(previousStatus)
+                    .toStatus(ComplaintStatus.ARCHIVED)
+                    .note("SLA deadline exceeded: " + complaint.getTargetDate())
+                    .build());
+
+            log.warn("[SLA Monitor] Complaint {} exceeded SLA deadline and was archived. Category: {}, Target: {}",
                     complaint.getComplaintId(),
                     complaint.getCategory().getLabel(),
                     complaint.getTargetDate());
@@ -58,7 +70,7 @@ public class SlaMonitoringScheduler {
                         .complaint(complaint)
                         .eventType("SLA_OVERDUE")
                         .message(String.format(
-                                "Complaint '%s' (ID: %s) has exceeded its SLA deadline of %s.",
+                                "Complaint '%s' (ID: %s) exceeded its SLA deadline of %s and has been archived.",
                                 complaint.getTitle(),
                                 complaint.getComplaintId(),
                                 complaint.getTargetDate()))
@@ -69,6 +81,6 @@ public class SlaMonitoringScheduler {
             }
         }
 
-        log.info("[SLA Monitor] Flagged {} complaints as OVERDUE.", overdueComplaints.size());
+        log.info("[SLA Monitor] Archived {} complaints that exceeded their SLA deadline.", overdueComplaints.size());
     }
 }

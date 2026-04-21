@@ -11,7 +11,10 @@ import com.pfa.backend.repository.AttachmentRepository;
 import com.pfa.backend.repository.CategoryRepository;
 import com.pfa.backend.repository.CitizenRepository;
 import com.pfa.backend.repository.ComplaintRepository;
+import com.pfa.backend.repository.ComplaintStatusHistoryRepository;
 import com.pfa.backend.repository.MunicipalAgentRepository;
+import com.pfa.backend.repository.NotificationRepository;
+import com.pfa.backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +50,15 @@ class ComplaintServiceSlaTest {
 
     @Mock
     private FileStorageService fileStorageService;
+
+    @Mock
+    private NotificationRepository notificationRepository;
+
+    @Mock
+    private ComplaintStatusHistoryRepository statusHistoryRepository;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private ComplaintService complaintService;

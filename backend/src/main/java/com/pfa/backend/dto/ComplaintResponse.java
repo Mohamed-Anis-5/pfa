@@ -24,4 +24,6 @@ public class ComplaintResponse {
     private String assignedAgentEmail;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
+    private OffsetDateTime resolvedAt;
+    private String resolutionComment;
 }

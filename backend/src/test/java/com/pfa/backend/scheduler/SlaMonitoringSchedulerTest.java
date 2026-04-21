@@ -3,10 +3,12 @@ package com.pfa.backend.scheduler;
 import com.pfa.backend.entity.Administrator;
 import com.pfa.backend.entity.Category;
 import com.pfa.backend.entity.Complaint;
+import com.pfa.backend.entity.ComplaintStatusHistory;
 import com.pfa.backend.entity.Notification;
 import com.pfa.backend.entity.User;
 import com.pfa.backend.enums.ComplaintStatus;
 import com.pfa.backend.repository.ComplaintRepository;
+import com.pfa.backend.repository.ComplaintStatusHistoryRepository;
 import com.pfa.backend.repository.NotificationRepository;
 import com.pfa.backend.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -39,6 +41,9 @@ class SlaMonitoringSchedulerTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ComplaintStatusHistoryRepository statusHistoryRepository;
+
     @InjectMocks
     private SlaMonitoringScheduler scheduler;
 
@@ -61,8 +66,9 @@ class SlaMonitoringSchedulerTest {
 
         scheduler.checkOverdueComplaints();
 
-        assertEquals(ComplaintStatus.OVERDUE, complaint.getStatus());
+        assertEquals(ComplaintStatus.ARCHIVED, complaint.getStatus());
         verify(complaintRepository, times(1)).save(complaint);
+        verify(statusHistoryRepository, times(1)).save(any(ComplaintStatusHistory.class));
 
         ArgumentCaptor<Notification> notificationCaptor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository, times(1)).save(notificationCaptor.capture());

@@ -13,6 +13,7 @@ export default function SubmitComplaint() {
   const [file,    setFile]    = useState(null);
   const [loading, setLoading] = useState(false);
   const [locMsg,  setLocMsg]  = useState("");
+  const [gpsError, setGpsError] = useState(false);
   const [error,   setError]   = useState("");
 
   useEffect(() => {
@@ -26,6 +27,7 @@ export default function SubmitComplaint() {
 
   const captureLocation = () => {
     setLocMsg("Detecting location...");
+    setGpsError(false);
     navigator.geolocation.getCurrentPosition(
       pos => {
         setForm(f => ({
@@ -35,7 +37,10 @@ export default function SubmitComplaint() {
         }));
         setLocMsg(`📍 ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
       },
-      () => setLocMsg("❌ Could not get location")
+      () => {
+        setLocMsg("GPS unavailable — please enter coordinates manually.");
+        setGpsError(true);
+      }
     );
   };
 
@@ -64,9 +69,7 @@ export default function SubmitComplaint() {
       if (file) {
         const fd = new FormData();
         fd.append("file", file);
-        await api.post(`/complaints/${data.complaintId}/attachments`, fd, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await api.post(`/complaints/${data.complaintId}/attachments`, fd);
       }
       navigate("/citizen/complaints");
     } catch (err) {
@@ -160,7 +163,29 @@ export default function SubmitComplaint() {
             >
               📍 Capture My Location
             </button>
-            {locMsg && <p className="text-xs text-gray-500 mt-1">{locMsg}</p>}
+            {locMsg && <p className={`text-xs mt-1 ${gpsError ? 'text-orange-500' : 'text-gray-500'}`}>{locMsg}</p>}
+            {gpsError && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Latitude</label>
+                  <input type="number" step="any"
+                    className="w-full border rounded px-2 py-1 text-sm"
+                    placeholder="e.g. 36.8065"
+                    value={form.latitude ?? ""}
+                    onChange={e => setForm(f => ({ ...f, latitude: e.target.value ? parseFloat(e.target.value) : null }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">Longitude</label>
+                  <input type="number" step="any"
+                    className="w-full border rounded px-2 py-1 text-sm"
+                    placeholder="e.g. 10.1815"
+                    value={form.longitude ?? ""}
+                    onChange={e => setForm(f => ({ ...f, longitude: e.target.value ? parseFloat(e.target.value) : null }))}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {error && <p className="text-red-500 text-sm">{error}</p>}

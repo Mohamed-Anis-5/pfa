@@ -26,6 +26,9 @@ public class ComplaintService {
     private final MunicipalAgentRepository agentRepository;
     private final AttachmentRepository   attachmentRepository;
     private final FileStorageService     fileStorageService;
+    private final NotificationRepository notificationRepository;
+    private final ComplaintStatusHistoryRepository statusHistoryRepository;
+    private final UserRepository         userRepository;
 
     // -------------------------------------------------------
     // 1.1 + 1.2 + 1.3 — Create complaint
@@ -57,6 +60,16 @@ public class ComplaintService {
                 .build();
 
         complaintRepository.save(complaint);
+
+        // Record initial status history
+        statusHistoryRepository.save(ComplaintStatusHistory.builder()
+                .complaint(complaint)
+                .fromStatus(null)
+                .toStatus(ComplaintStatus.PENDING)
+                .changedBy(citizen)
+                .note("Complaint submitted")
+                .build());
+
         return toResponse(complaint);
     }
 
@@ -96,11 +109,37 @@ public class ComplaintService {
         MunicipalAgent agent = agentRepository.findById(request.getAgentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Agent not found"));
 
+        User admin = userRepository.findByEmail(adminEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Admin not found"));
+
+        ComplaintStatus previousStatus = complaint.getStatus();
         complaint.setAssignedAgent(agent);
         complaint.setStatus(ComplaintStatus.ASSIGNED);
         complaint.setUpdatedAt(OffsetDateTime.now());
 
-        return toResponse(complaintRepository.save(complaint));
+        complaintRepository.save(complaint);
+
+        // Record history
+        statusHistoryRepository.save(ComplaintStatusHistory.builder()
+                .complaint(complaint)
+                .fromStatus(previousStatus)
+                .toStatus(ComplaintStatus.ASSIGNED)
+                .changedBy(admin)
+                .note("Assigned to agent: " + agent.getEmail())
+                .build());
+
+        // Notify the assigned agent
+        Notification agentNotification = Notification.builder()
+                .user(agent)
+                .complaint(complaint)
+                .eventType("COMPLAINT_ASSIGNED")
+                .message(String.format("You have been assigned complaint '%s' (ID: %s). Please review and begin processing.",
+                        complaint.getTitle(), complaint.getComplaintId()))
+                .isRead(false)
+                .build();
+        notificationRepository.save(agentNotification);
+
+        return toResponse(complaint);
     }
 
     // -------------------------------------------------------
@@ -111,6 +150,9 @@ public class ComplaintService {
                                           UpdateStatusRequest request,
                                           String agentEmail) {
         Complaint complaint = findComplaintById(complaintId);
+        User agentUser = userRepository.findByEmail(agentEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Agent not found"));
+
         ComplaintStatus current = complaint.getStatus();
         ComplaintStatus next    = request.getNewStatus();
 
@@ -128,9 +170,33 @@ public class ComplaintService {
 
         if (next == ComplaintStatus.RESOLVED) {
             complaint.setResolvedAt(OffsetDateTime.now());
+            if (request.getNote() != null && !request.getNote().isBlank()) {
+                complaint.setResolutionComment(request.getNote());
+            }
+            // Notify the citizen
+            Notification citizenNotification = Notification.builder()
+                    .user(complaint.getCitizen())
+                    .complaint(complaint)
+                    .eventType("COMPLAINT_RESOLVED")
+                    .message(String.format("Your complaint '%s' has been resolved. You can now rate the service.",
+                            complaint.getTitle()))
+                    .isRead(false)
+                    .build();
+            notificationRepository.save(citizenNotification);
         }
 
-        return toResponse(complaintRepository.save(complaint));
+        complaintRepository.save(complaint);
+
+        // Record history
+        statusHistoryRepository.save(ComplaintStatusHistory.builder()
+                .complaint(complaint)
+                .fromStatus(current)
+                .toStatus(next)
+                .changedBy(agentUser)
+                .note(request.getNote())
+                .build());
+
+        return toResponse(complaint);
     }
 
     // -------------------------------------------------------
@@ -158,6 +224,8 @@ public class ComplaintService {
                         ? c.getAssignedAgent().getEmail() : null)
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
+                .resolvedAt(c.getResolvedAt())
+                .resolutionComment(c.getResolutionComment())
                 .build();
     }
 

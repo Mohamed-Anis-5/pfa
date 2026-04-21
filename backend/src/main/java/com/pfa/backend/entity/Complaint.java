@@ -65,6 +65,9 @@ public class Complaint {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @Column(name = "resolution_comment", columnDefinition = "TEXT")
+    private String resolutionComment;
+
     @Column(name = "resolved_at")  private OffsetDateTime resolvedAt;
     @Column(name = "closed_at")    private OffsetDateTime closedAt;
     @Column(name = "archived_at")  private OffsetDateTime archivedAt;
