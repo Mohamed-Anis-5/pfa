@@ -9,6 +9,9 @@ import lombok.*;
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
 public class Administrator extends User {
 
+    @Column(name = "identifiant_unique", unique = true, length = 50)
+    private String identifiantUnique;
+
     @Column(name = "role_level", nullable = false, length = 50)
     private String roleLevel = "STANDARD";
 

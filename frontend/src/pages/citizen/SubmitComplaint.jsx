@@ -3,18 +3,70 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../../components/shared/Navbar";
 import api from "../../api/axios";
 
+const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+
+function getApiErrorMessage(err, fallbackMessage) {
+  if (err.response?.status === 401 || err.response?.status === 403) {
+    return "Session expired. Please sign in again.";
+  }
+
+  if (err.response?.data?.message) {
+    return err.response.data.message;
+  }
+
+  if (err.response?.data?.error) {
+    return err.response.data.error;
+  }
+
+  if (err.response?.statusText) {
+    return `Error: ${err.response.statusText}`;
+  }
+
+  if (err.message) {
+    return `Error: ${err.message}`;
+  }
+
+  return fallbackMessage;
+}
+
 export default function SubmitComplaint() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState([]);
   const [form, setForm] = useState({
     title: "", description: "", priority: "Medium",
-    categoryId: "", latitude: null, longitude: null,
+    categoryId: "", latitude: null, longitude: null, streetName: "",
   });
   const [file,    setFile]    = useState(null);
   const [loading, setLoading] = useState(false);
   const [locMsg,  setLocMsg]  = useState("");
   const [gpsError, setGpsError] = useState(false);
   const [error,   setError]   = useState("");
+
+  const handleFileChange = (event) => {
+    const selectedFile = event.target.files?.[0] ?? null;
+
+    if (!selectedFile) {
+      setFile(null);
+      return;
+    }
+
+    if (!selectedFile.type.startsWith("image/")) {
+      setFile(null);
+      setError("Please choose an image file for the complaint photo.");
+      event.target.value = "";
+      return;
+    }
+
+    if (selectedFile.size > MAX_IMAGE_SIZE_BYTES) {
+      setFile(null);
+      setError("Image upload is limited to 10 MB. Please choose a smaller photo.");
+      event.target.value = "";
+      return;
+    }
+
+    setError("");
+    setFile(selectedFile);
+  };
 
   useEffect(() => {
     api.get("/categories")
@@ -38,7 +90,7 @@ export default function SubmitComplaint() {
         setLocMsg(`📍 ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
       },
       () => {
-        setLocMsg("GPS unavailable — please enter coordinates manually.");
+        setLocMsg("GPS unavailable — please enter the street name instead.");
         setGpsError(true);
       }
     );
@@ -53,8 +105,11 @@ export default function SubmitComplaint() {
       return;
     }
 
-    if (form.latitude == null || form.longitude == null) {
-      setError("Location is required. Please capture your location before submitting.");
+    const hasCoordinates = form.latitude != null && form.longitude != null;
+    const hasStreetName = form.streetName.trim().length > 0;
+
+    if (!hasCoordinates && !hasStreetName) {
+      setError("Location is required. Capture your GPS location or enter the street name.");
       return;
     }
 
@@ -66,52 +121,70 @@ export default function SubmitComplaint() {
     setLoading(true);
     try {
       const { data } = await api.post("/complaints", form);
+
       if (file) {
-        const fd = new FormData();
-        fd.append("file", file);
-        await api.post(`/complaints/${data.complaintId}/attachments`, fd);
+        try {
+          const fd = new FormData();
+          fd.append("file", file);
+          await api.post(`/complaints/${data.complaintId}/attachments`, fd);
+        } catch (attachmentError) {
+          console.error("Complaint attachment error:", attachmentError.response?.data || attachmentError.message);
+          navigate("/citizen/complaints", {
+            state: {
+              notice: `Complaint submitted successfully, but the photo could not be uploaded. ${getApiErrorMessage(attachmentError, "You can retry later from support if needed.")}`,
+            },
+          });
+          return;
+        }
       }
+
       navigate("/citizen/complaints");
     } catch (err) {
       console.error("Complaint submission error:", err.response?.data || err.message);
-      let message = "Submission failed";
-      if (err.response?.status === 401 || err.response?.status === 403) {
-        message = "Session expired. Please sign in again.";
-      } else if (err.response?.data?.message) {
-        message = err.response.data.message;
-      } else if (err.response?.data?.error) {
-        message = err.response.data.error;
-      } else if (err.response?.statusText) {
-        message = `Error: ${err.response.statusText}`;
-      } else if (err.message) {
-        message = `Error: ${err.message}`;
-      }
-      setError(message);
+      setError(getApiErrorMessage(err, "Submission failed"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="civic-internal-page">
       <Navbar links={[{ to: "/citizen", label: "← Back" }]} />
-      <div className="max-w-lg mx-auto p-6 mt-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Submit a Complaint</h2>
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow p-6 space-y-4">
+      <main className="civic-internal-main grid gap-6 lg:grid-cols-[0.86fr_1.14fr] lg:items-start">
+        <section className="civic-panel rounded-[2rem] px-6 py-7 sm:px-8">
+          <p className="civic-kicker">New complaint</p>
+          <h1 className="mt-3 text-5xl leading-[1.04] tracking-[-0.05em] text-[#16372d] sm:text-6xl">Tell the city what needs attention.</h1>
+          <p className="mt-5 text-base leading-8 text-[#5d736b]">
+            Give the issue a clear title, category, location, and supporting evidence so municipal teams can route it quickly.
+          </p>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-            <input required
-              className="w-full border rounded-lg px-3 py-2"
+          <div className="mt-8 space-y-3">
+            {[
+              "Use a precise title so the issue is easy to scan in dashboards.",
+              "Attach your location to avoid routing delays.",
+              "Add a photo when visual evidence will help field teams act faster.",
+            ].map((tip) => (
+              <div key={tip} className="rounded-[1.35rem] border border-[#16372d]/8 bg-white/72 px-4 py-4 text-sm leading-7 text-[#5d736b]">
+                {tip}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <form onSubmit={handleSubmit} className="civic-panel rounded-[2rem] p-6 space-y-4 sm:p-8" aria-describedby={error ? "submit-complaint-error" : undefined}>
+
+          <div className="civic-field">
+            <label htmlFor="complaint-title">Title</label>
+            <input id="complaint-title" name="title" required
+              placeholder="Describe the problem briefly"
               value={form.title}
               onChange={e => setForm({ ...form, title: e.target.value })}
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select required
-              className="w-full border rounded-lg px-3 py-2"
+          <div className="civic-field">
+            <label htmlFor="complaint-category">Category</label>
+            <select id="complaint-category" name="categoryId" required
               value={form.categoryId}
               onChange={e => setForm({ ...form, categoryId: e.target.value ? parseInt(e.target.value, 10) : "" })}
             >
@@ -121,14 +194,15 @@ export default function SubmitComplaint() {
               ))}
             </select>
             {categories.length === 0 && !error && (
-              <p className="text-xs text-gray-500 mt-1">No categories available.</p>
+              <p className="text-xs text-[#5d736b] mt-1">No categories available.</p>
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+          <div className="civic-field">
+            <label htmlFor="complaint-priority">Priority</label>
             <select
-              className="w-full border rounded-lg px-3 py-2"
+              id="complaint-priority"
+              name="priority"
               value={form.priority}
               onChange={e => setForm({ ...form, priority: e.target.value })}
             >
@@ -138,65 +212,76 @@ export default function SubmitComplaint() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <textarea required rows={3}
+          <div className="civic-field">
+            <label htmlFor="complaint-description">Description</label>
+            <textarea id="complaint-description" name="description" required rows={3}
               minLength={10}
-              className="w-full border rounded-lg px-3 py-2"
+              placeholder="Explain what is happening, why it matters, and what someone on-site would see."
               value={form.description}
               onChange={e => setForm({ ...form, description: e.target.value })}
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Photo (optional)</label>
-            <input type="file" accept="image/*"
-              className="w-full text-sm"
-              onChange={e => setFile(e.target.files[0])}
+          <div className="civic-field">
+            <label htmlFor="complaint-photo">Photo (optional)</label>
+            <input id="complaint-photo" name="photo" type="file" accept="image/*"
+              className="text-sm"
+              onChange={handleFileChange}
             />
+            <p className="mt-1 text-xs leading-6 text-[#5d736b]">Accepted formats: images only, up to 10 MB.</p>
           </div>
 
-          <div>
+          <div className="space-y-3 rounded-[1.35rem] border border-[#16372d]/8 bg-[#f6efe3] p-4">
+            <div>
+              <p className="text-sm font-semibold text-[#16372d]">Location</p>
+              <p className="mt-1 text-sm leading-7 text-[#5d736b]">Capture your current position when it works, or enter the street name if GPS is unavailable.</p>
+            </div>
             <button type="button"
               onClick={captureLocation}
-              className="bg-gray-100 border rounded-lg px-4 py-2 text-sm hover:bg-gray-200 transition"
+              aria-describedby={locMsg ? "complaint-location-status" : undefined}
+              className="civic-button-secondary"
             >
-              📍 Capture My Location
+              Capture my location
             </button>
-            {locMsg && <p className={`text-xs mt-1 ${gpsError ? 'text-orange-500' : 'text-gray-500'}`}>{locMsg}</p>}
+            {locMsg && (
+              <p
+                id="complaint-location-status"
+                aria-live="polite"
+                className={`text-sm ${gpsError ? 'text-[#9a5b19]' : 'text-[#4f655d]'}`}
+              >
+                {locMsg}
+              </p>
+            )}
+            <div className="civic-field">
+              <label htmlFor="complaint-street-name">Street name</label>
+              <input
+                id="complaint-street-name"
+                name="streetName"
+                type="text"
+                placeholder="Example: Habib Bourguiba Avenue, near the central school"
+                value={form.streetName}
+                onChange={e => setForm(f => ({ ...f, streetName: e.target.value }))}
+              />
+              <p className="text-xs leading-6 text-[#5d736b]">
+                Use this when GPS is not available or when the street name will help teams find the issue faster.
+              </p>
+            </div>
             {gpsError && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Latitude</label>
-                  <input type="number" step="any"
-                    className="w-full border rounded px-2 py-1 text-sm"
-                    placeholder="e.g. 36.8065"
-                    value={form.latitude ?? ""}
-                    onChange={e => setForm(f => ({ ...f, latitude: e.target.value ? parseFloat(e.target.value) : null }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1">Longitude</label>
-                  <input type="number" step="any"
-                    className="w-full border rounded px-2 py-1 text-sm"
-                    placeholder="e.g. 10.1815"
-                    value={form.longitude ?? ""}
-                    onChange={e => setForm(f => ({ ...f, longitude: e.target.value ? parseFloat(e.target.value) : null }))}
-                  />
-                </div>
-              </div>
+              <p className="text-sm text-[#9a5b19]">
+                GPS is not available on this device right now. Street name submission is enabled.
+              </p>
             )}
           </div>
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p id="submit-complaint-error" role="alert" className="civic-alert">{error}</p>}
 
-          <button type="submit" disabled={loading || form.latitude == null || form.longitude == null}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 transition"
+          <button type="submit" disabled={loading}
+            className="civic-button-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Submitting..." : "Submit Complaint"}
           </button>
         </form>
-      </div>
+      </main>
     </div>
   );
 }

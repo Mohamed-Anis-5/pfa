@@ -27,7 +27,7 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401 || err.response?.status === 403) {
       localStorage.clear();
-      window.location.href = "/login";
+      window.location.href = "/";
     }
     return Promise.reject(err);
   }

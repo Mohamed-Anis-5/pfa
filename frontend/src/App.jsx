@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
-import { useAuth } from "./context/useAuth";
 
 import Login            from "./pages/auth/Login";
 import Register         from "./pages/auth/Register";
+import Home             from "./pages/home/Home";
 import CitizenDashboard from "./pages/citizen/CitizenDashbord";
 import SubmitComplaint  from "./pages/citizen/SubmitComplaint";
 import MyComplaints     from "./pages/citizen/MyComplaints";
@@ -11,15 +11,6 @@ import AdminDashboard   from "./pages/admin/AdminDashboard";
 import Analytics        from "./pages/admin/Analytics";
 import AgentDashboard   from "./pages/agent/AgentDashboard";
 import ProtectedRoute   from "./routes/ProtectedRoute";
-
-function RoleRedirect() {
-  const { user } = useAuth();
-  if (!user) return <Navigate to="/login" />;
-  if (user.role === "ROLE_CITIZEN") return <Navigate to="/citizen" />;
-  if (user.role === "ROLE_ADMIN")   return <Navigate to="/admin" />;
-  if (user.role === "ROLE_AGENT")   return <Navigate to="/agent" />;
-  return <Navigate to="/login" />;
-}
 
 export default function App() {
   return (
@@ -30,8 +21,8 @@ export default function App() {
           <Route path="/login"    element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Role redirect */}
-          <Route path="/" element={<RoleRedirect />} />
+          {/* Public home */}
+          <Route path="/" element={<Home />} />
 
           {/* Citizen */}
           <Route path="/citizen" element={

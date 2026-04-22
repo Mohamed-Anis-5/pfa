@@ -2,6 +2,22 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import api from "../../api/axios";
+import AuthShell from "../../components/shared/AuthShell";
+
+const loginHighlights = [
+  {
+    title: "Fast reporting workflow",
+    text: "Citizen reports move from submission to field assignment through one calm interface.",
+  },
+  {
+    title: "Built for municipal teams",
+    text: "Agents and administrators get focused dashboards instead of generic admin panels.",
+  },
+  {
+    title: "Transparent follow-up",
+    text: "Every update remains visible so people can see whether an issue is being handled.",
+  },
+];
 
 export default function Login() {
   const { login } = useAuth();
@@ -24,43 +40,60 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold text-center text-blue-700 mb-6">
-          Municipal Complaints
-        </h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+    <AuthShell
+      eyebrow="Account access"
+      title="Sign in to manage local issues with a clearer workflow."
+      description="Access the role-specific dashboard for reporting, assignment, and service follow-up in a more modern civic interface."
+      highlights={loginHighlights}
+      footer={(
+        <p className="mt-6 text-sm text-[#5e746d]">
+          No account yet?{" "}
+          <Link to="/register" className="font-semibold text-[#16372d] hover:text-[#0f4f41]">
+            Create one here
+          </Link>
+        </p>
+      )}
+    >
+      <div className="space-y-6">
+        <div>
+          <p className="civic-kicker">Welcome back</p>
+          <h2 className="mt-3 text-4xl tracking-[-0.04em] text-[#16372d]">Secure account sign in</h2>
+          <p className="mt-3 max-w-xl text-sm leading-7 text-[#5d736b]">
+            Use the credentials linked to your citizen, agent, or administrator account.
+          </p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4" aria-describedby={error ? "login-error" : undefined}>
+          <div className="civic-field">
+            <label htmlFor="login-email">Email</label>
             <input
+              id="login-email"
+              name="email"
               type="email" required
-              className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              autoComplete="email"
+              placeholder="you@municipality.tn"
               value={form.email}
               onChange={e => setForm({ ...form, email: e.target.value })}
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <div className="civic-field">
+            <label htmlFor="login-password">Password</label>
             <input
+              id="login-password"
+              name="password"
               type="password" required
-              className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              autoComplete="current-password"
+              placeholder="Enter your password"
               value={form.password}
               onChange={e => setForm({ ...form, password: e.target.value })}
             />
           </div>
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
-          >
+          {error && <p id="login-error" role="alert" className="civic-alert">{error}</p>}
+          <button type="submit" className="civic-button-primary w-full">
             Sign In
           </button>
         </form>
-        <p className="text-center text-sm text-gray-500 mt-4">
-          No account?{" "}
-          <Link to="/register" className="text-blue-600 hover:underline">Register</Link>
-        </p>
       </div>
-    </div>
+    </AuthShell>
   );
 }

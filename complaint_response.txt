@@ -1,0 +1,15 @@
+HTTP/1.1 201 
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Pragma: no-cache
+Expires: 0
+X-Frame-Options: DENY
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Wed, 22 Apr 2026 17:35:25 GMT
+
+{"assignedAgentEmail":null,"categoryLabel":"Voirie","citizenEmail":"citizen1.demo@municipalite.tn","complaintId":"f49701ce-698c-4909-8cb7-7fc0fac284c4","createdAt":"2026-04-22T17:35:25.049612078Z","description":"Testing complaint submission through the live API.","latitude":null,"longitude":null,"priority":"Medium","resolutionComment":null,"resolvedAt":null,"slaDays":3,"status":"PENDING","streetName":"Habib Bourguiba Avenue","targetDate":"2026-04-25","title":"Network error repro","updatedAt":"2026-04-22T17:35:25.049626323Z"}

@@ -21,12 +21,15 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -101,5 +104,73 @@ class ComplaintServiceSlaTest {
         assertEquals(LocalDate.now().plusDays(3), savedComplaint.getTargetDate());
         assertEquals(LocalDate.now().plusDays(3), response.getTargetDate());
         assertEquals("Voirie", response.getCategoryLabel());
+    }
+
+    @Test
+    void createComplaintAcceptsStreetNameWhenCoordinatesAreUnavailable() {
+        ComplaintCreateRequest request = new ComplaintCreateRequest();
+        request.setTitle("Blocked access");
+        request.setDescription("Debris blocking the entrance to the street");
+        request.setPriority(Priority.Medium);
+        request.setCategoryId(1);
+        request.setStreetName("Habib Bourguiba Avenue");
+
+        Citizen citizen = new Citizen();
+        citizen.setId(11L);
+        citizen.setEmail("citizen.demo@municipalite.tn");
+
+        Category category = Category.builder()
+                .id(1)
+                .label("Voirie")
+                .slaDays(3)
+                .build();
+
+        when(citizenRepository.findByEmail("citizen.demo@municipalite.tn"))
+                .thenReturn(Optional.of(citizen));
+        when(categoryRepository.findById(1)).thenReturn(Optional.of(category));
+
+        ArgumentCaptor<Complaint> complaintCaptor = ArgumentCaptor.forClass(Complaint.class);
+        when(complaintRepository.save(complaintCaptor.capture())).thenAnswer(invocation -> {
+            Complaint complaint = invocation.getArgument(0);
+            complaint.setComplaintId(UUID.randomUUID());
+            return complaint;
+        });
+
+        ComplaintResponse response = complaintService.createComplaint(request, "citizen.demo@municipalite.tn");
+
+        Complaint savedComplaint = complaintCaptor.getValue();
+        assertEquals("Habib Bourguiba Avenue", savedComplaint.getStreetName());
+        assertNull(savedComplaint.getLatitude());
+        assertNull(savedComplaint.getLongitude());
+        assertEquals("Habib Bourguiba Avenue", response.getStreetName());
+    }
+
+    @Test
+    void createComplaintRejectsMissingCoordinatesAndStreetName() {
+        ComplaintCreateRequest request = new ComplaintCreateRequest();
+        request.setTitle("Blocked access");
+        request.setDescription("Debris blocking the entrance to the street");
+        request.setPriority(Priority.Medium);
+        request.setCategoryId(1);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> complaintService.createComplaint(request, "citizen.demo@municipalite.tn"));
+
+        assertEquals("400 BAD_REQUEST \"Location is required. Capture GPS coordinates or provide a street name.\"",
+                exception.getMessage());
+    }
+
+    @Test
+    void createComplaintRejectsMissingCategory() {
+        ComplaintCreateRequest request = new ComplaintCreateRequest();
+        request.setTitle("Blocked access");
+        request.setDescription("Debris blocking the entrance to the street");
+        request.setPriority(Priority.Medium);
+        request.setStreetName("Habib Bourguiba Avenue");
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> complaintService.createComplaint(request, "citizen.demo@municipalite.tn"));
+
+        assertEquals("400 BAD_REQUEST \"Complaint category is required.\"", exception.getMessage());
     }
 }

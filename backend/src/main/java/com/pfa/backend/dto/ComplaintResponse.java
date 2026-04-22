@@ -17,6 +17,7 @@ public class ComplaintResponse {
     private Priority priority;
     private Double latitude;
     private Double longitude;
+    private String streetName;
     private String categoryLabel;
     private Integer slaDays;
     private LocalDate targetDate;

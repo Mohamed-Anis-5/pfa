@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -16,6 +17,8 @@ public interface ComplaintRepository extends JpaRepository<Complaint, UUID> {
     List<Complaint> findByCitizenId(Long citizenId);
     List<Complaint> findByAssignedAgentId(Long agentId);
     List<Complaint> findByStatus(ComplaintStatus status);
+    List<Complaint> findTop5ByOrderByCreatedAtDesc();
+    long countByCreatedAtBetween(OffsetDateTime start, OffsetDateTime end);
 
     // SLA: complaints that are active and overdue
     @Query("""

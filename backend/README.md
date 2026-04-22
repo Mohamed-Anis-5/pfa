@@ -1,81 +1,122 @@
-# Backend (Spring Boot)
+# Municipal Complaint Platform Backend
 
 ## Overview
-This is a Spring Boot backend using:
+This backend is a Spring Boot REST API for the municipal complaint platform. It handles authentication, role-based workflows, complaint creation and tracking, SLA calculation, attachment uploads, and the public summary data shown on the frontend home page.
+
+## Stack
+- Spring Boot 4
 - Spring Web MVC
 - Spring Security + JWT
-- Spring Data JPA
-- PostgreSQL (default runtime DB)
-- H2 (test/in-memory support)
+- Spring Data JPA / Hibernate
+- PostgreSQL / PostGIS for runtime
+- H2 for tests
+
+## Main Features
+- Register and login endpoints for citizens, agents, and administrators
+- Role-aware registration using `ROLE_CITIZEN`, `ROLE_AGENT`, and `ROLE_ADMIN`
+- Compatibility for short role values such as `CITIZEN`, `AGENT`, and `ADMIN`
+- Complaint creation with category-based SLA calculation
+- Complaint location support through GPS coordinates or `streetName`
+- Attachment upload endpoint restricted to image files
+- Public summary endpoint at `GET /api/complaints/public/home`
+- Admin and agent workflow endpoints for assignment and status changes
 
 ## Prerequisites
 - Java 21+
-- Maven 3.9+
-- PostgreSQL (only for default runtime mode)
+- Maven 3.9+ or the included Maven wrapper `./mvnw`
+- PostgreSQL 16+ for default runtime mode
+- Docker optional
 
-## Project Structure (Quick)
-- src/main/java/com/pfa/backend: application code
-- src/main/resources/application.properties: default runtime config (PostgreSQL)
-- src/test/java: tests
-- src/test/resources/application.properties: test config (H2)
+## Project Structure
+- `src/main/java/com/pfa/backend`: application source
+- `src/main/resources/application.properties`: default runtime configuration
+- `src/test/java`: tests
+- `src/test/resources/application.properties`: H2 test configuration
 
-## Setup
-1. Clone and enter project:
+## Local Development
+1. Enter the backend directory:
+
 ```bash
-git clone <your-repo-url>
 cd backend
 ```
 
-2. (Optional) Start PostgreSQL and create DB/user matching current config in src/main/resources/application.properties:
-- DB: municipal_db
-- User: municipal_user
-- Password: municipal_pass
+2. Build the project:
 
-3. Build project:
 ```bash
-mvn clean package
+./mvnw clean package
 ```
 
-## Run the Application
+3. Run with PostgreSQL using the default configuration:
 
-### Option A: Default mode (PostgreSQL)
-Uses src/main/resources/application.properties.
 ```bash
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
-### Option B: In-memory mode (H2, no PostgreSQL required)
+### H2 In-Memory Mode
+If you want to run the backend without PostgreSQL:
+
 ```bash
-mvn spring-boot:run -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:h2:mem:devdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL --spring.datasource.driver-class-name=org.h2.Driver --spring.datasource.username=sa --spring.datasource.password= --spring.jpa.hibernate.ddl-auto=create-drop --spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"
+./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:h2:mem:devdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL --spring.datasource.driver-class-name=org.h2.Driver --spring.datasource.username=sa --spring.datasource.password= --spring.jpa.hibernate.ddl-auto=create-drop --spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"
 ```
+
+## Docker Compose
+From the repository root:
+
+```bash
+docker compose up -d --build db backend
+```
+
+To run the full stack:
+
+```bash
+docker compose up -d --build backend frontend
+```
+
+With the repository Docker setup:
+- Database: `localhost:5432`
+- Backend API: `localhost:8080`
+- Frontend: `localhost:5173`
 
 ## Execute Tests
+Run the full test suite:
+
 ```bash
-mvn test
+./mvnw test
 ```
 
-Tests use H2 via src/test/resources/application.properties.
+Run a focused complaint-service test:
 
-## Preloaded Demo Data
-
-The backend now includes an automatic startup seeder
-(`src/main/java/com/pfa/backend/config/DataSeeder.java`).
-
-When the app starts, it ensures baseline data exists:
-- Categories: Voirie, Eclairage public, Assainissement, Espaces verts
-- Users:
-  - Admin: admin.demo@municipalite.tn / Admin@123
-  - Agent: agent.demo@municipalite.tn / Agent@123
-  - Citizen: citizen.demo@municipalite.tn / Citizen@123
-- One starter complaint linked to the demo citizen
-
-To disable seeding explicitly:
 ```bash
-mvn spring-boot:run -Dspring-boot.run.arguments="--app.seed.enabled=false"
+./mvnw -q -Dtest=ComplaintServiceSlaTest test
 ```
+
+Tests use H2 via `src/test/resources/application.properties`.
+
+## Seed Data
+The project includes an optional startup seeder in:
+
+- `src/main/java/com/pfa/backend/config/DataSeeder.java`
+
+Important:
+- The repository root `docker-compose.yml` currently sets `APP_SEED_ENABLED=false`
+- That means the default Docker startup does not create demo accounts automatically
+
+Enable seeding in local runs with:
+
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.arguments="--app.seed.enabled=true"
+```
+
+Or in Docker Compose by starting the backend with `APP_SEED_ENABLED=true`.
+
+When seeding is enabled, these demo accounts are created:
+- Admin: `admin.demo@municipalite.tn` / `Admin@123`
+- Agent: `agent.demo@municipalite.tn` / `Agent@123`
+- Citizen: `citizen.demo@municipalite.tn` / `Citizen@123`
+
+The seeder also creates the default complaint categories and one starter complaint.
 
 ## Demo Rehearsal Script
-
 Use the script below to rehearse the full workflow repeatedly:
 
 ```bash
@@ -83,16 +124,16 @@ chmod +x scripts/rehearse_demo.sh
 REHEARSALS=3 ./scripts/rehearse_demo.sh
 ```
 
-What it validates in each run:
-- Login for citizen, admin, and agent
-- Complaint creation by citizen
-- Assignment by admin
-- Status transitions by agent (IN_PROGRESS -> RESOLVED)
-- Feedback submission by citizen (RESOLVED -> CLOSED)
+Each run validates:
+- login for citizen, admin, and agent
+- complaint creation by citizen
+- assignment by admin
+- status transitions by agent (`IN_PROGRESS -> RESOLVED`)
+- feedback submission by citizen (`RESOLVED -> CLOSED`)
 
-## API Smoke Test (Auth)
+## API Smoke Tests
 
-### Register citizen
+### Register a citizen
 ```bash
 curl -X POST http://localhost:8080/api/auth/register \
   -H "Content-Type: application/json" \
@@ -102,8 +143,9 @@ curl -X POST http://localhost:8080/api/auth/register \
     "email": "anis@test.com",
     "password": "secret123",
     "phoneNumber": "21234567",
+    "numCin": "12345678",
     "identifiantUnique": "12345678901",
-    "role": "CITIZEN"
+    "role": "ROLE_CITIZEN"
   }'
 ```
 
@@ -114,8 +156,26 @@ curl -X POST http://localhost:8080/api/auth/login \
   -d '{"email": "anis@test.com", "password": "secret123"}'
 ```
 
-Expected result for both calls: JSON response containing token, email, and role.
+### Create a complaint with street-name fallback
+```bash
+curl -X POST http://localhost:8080/api/complaints \
+  -H "Authorization: Bearer <JWT_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Streetlight issue",
+    "description": "Streetlight has been broken for several nights.",
+    "priority": "Medium",
+    "categoryId": 2,
+    "streetName": "Habib Bourguiba Avenue"
+  }'
+```
+
+### Read public home summary data
+```bash
+curl http://localhost:8080/api/complaints/public/home
+```
 
 ## Notes
-- On Linux, Java file names are case-sensitive. Keep `AuthService.java` with lowercase `.java` extension.
-- The `target/` folder is generated build output and should not be manually edited.
+- The frontend defaults to `http://localhost:8080/api` as its API base URL.
+- The `target/` directory is generated build output and should not be edited manually.
+- On Linux, Java file names are case-sensitive.

@@ -85,4 +85,9 @@ public ResponseEntity<List<ComplaintResponse>> getAssigned(
 public ResponseEntity<List<ComplaintResponse>> getAll() {
     return ResponseEntity.ok(complaintService.getAllComplaints());
 }
+
+@GetMapping("/public/home")
+public ResponseEntity<PublicHomeSummaryResponse> getPublicHomeSummary() {
+    return ResponseEntity.ok(complaintService.getPublicHomeSummary());
+}
 }

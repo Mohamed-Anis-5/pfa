@@ -1,0 +1,15 @@
+HTTP/1.1 200 
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Pragma: no-cache
+Expires: 0
+X-Frame-Options: DENY
+Content-Type: application/json
+Transfer-Encoding: chunked
+Date: Wed, 22 Apr 2026 17:35:22 GMT
+
+{"token":"eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJjaXRpemVuMS5kZW1vQG11bmljaXBhbGl0ZS50biIsImlhdCI6MTc3Njg3OTMyMiwiZXhwIjoxNzc2OTY1NzIyfQ.yGK2pYtuY8aZ4ATMBjSj-PI_mYac0lFRRdWyw9rDnvjYJrxWjLzbju3q8mBxIbhQIDFwnr8GUgPS4zkU6ki3tg","email":"citizen1.demo@municipalite.tn","role":"ROLE_CITIZEN"}

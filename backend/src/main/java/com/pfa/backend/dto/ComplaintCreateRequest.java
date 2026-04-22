@@ -11,4 +11,5 @@ public class ComplaintCreateRequest {
     private Integer categoryId;
     private Double latitude;
     private Double longitude;
+    private String streetName;
 }

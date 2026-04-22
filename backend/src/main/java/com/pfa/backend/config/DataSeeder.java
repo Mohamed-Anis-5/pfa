@@ -92,6 +92,7 @@ public class DataSeeder implements CommandLineRunner {
                     admin.setPassword(passwordEncoder.encode("Admin@123"));
                     admin.setPhoneNumber("20000001");
                     admin.setRole(UserRole.ROLE_ADMIN);
+                    admin.setIdentifiantUnique("ADM-DEMO-001");
                     admin.setRoleLevel("SUPER");
                     admin.setCanValidateBudget(true);
                     return (Administrator) userRepository.save(admin);

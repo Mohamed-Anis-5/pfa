@@ -14,8 +14,8 @@ VALUES (9001, NOW(), NOW(), '99371713', 'ADMIN', 'Mohamed Anis', 'Bahri',
         '$2a$10$Yn4Wfe9pxyqS5XJcSVfgaeXpuUQkz6koKalfBuRf.dm7hIM.R0ATu', 'ROLE_ADMIN')
 ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = NOW();
 
-INSERT INTO administrators (id, role_level, can_validate_budget)
-VALUES (9001, 'SUPER', true)
+INSERT INTO administrators (id, identifiant_unique, role_level, can_validate_budget)
+VALUES (9001, 'ADM-9001', 'SUPER', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Permanent Admin 2: Ahmed Rami Hassine
@@ -25,8 +25,8 @@ VALUES (9002, NOW(), NOW(), '22222222', 'ADMIN', 'Ahmed Rami', 'Hassine',
         '$2a$10$Yn4Wfe9pxyqS5XJcSVfgaeXpuUQkz6koKalfBuRf.dm7hIM.R0ATu', 'ROLE_ADMIN')
 ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = NOW();
 
-INSERT INTO administrators (id, role_level, can_validate_budget)
-VALUES (9002, 'SUPER', true)
+INSERT INTO administrators (id, identifiant_unique, role_level, can_validate_budget)
+VALUES (9002, 'ADM-9002', 'SUPER', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Permanent Agent 1: agent1 (unique identifier 33333333333 stored as matricule)
@@ -85,8 +85,8 @@ INSERT INTO users (id, created_at, updated_at, phone_number, user_type, first_na
 (5, NOW(), NOW(), '20000022', 'CITIZEN', 'Nour',    'Sassi',     'citizen2.demo@municipalite.tn','$2a$10$Yn4Wfe9pxyqS5XJcSVfgaeXpuUQkz6koKalfBuRf.dm7hIM.R0ATu', 'ROLE_CITIZEN'),
 (6, NOW(), NOW(), '20000023', 'CITIZEN', 'Youssef', 'Cherif',    'citizen3.demo@municipalite.tn','$2a$10$Yn4Wfe9pxyqS5XJcSVfgaeXpuUQkz6koKalfBuRf.dm7hIM.R0ATu', 'ROLE_CITIZEN');
 
-INSERT INTO administrators (id, role_level, can_validate_budget) VALUES
-(1, 'SUPER', TRUE);
+INSERT INTO administrators (id, identifiant_unique, role_level, can_validate_budget) VALUES
+(1, 'ADM-DEMO-001', 'SUPER', TRUE);
 
 INSERT INTO municipal_agents (id, matricule, arrondissement, grade, service_type) VALUES
 (2, 'AG-DEMO-001', 'Centre Ville', 'Cat_A', 'Voirie'),

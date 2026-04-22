@@ -2,21 +2,30 @@ import { useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import { AuthContext } from "./authContext";
 
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return null;
+function getStoredUser() {
+  const token = localStorage.getItem("token");
+  if (!token) return null;
 
-    try {
-      const decoded = jwtDecode(token);
-      const role = localStorage.getItem("role");
-      const email = localStorage.getItem("email");
-      return { token, role, email, decoded };
-    } catch {
+  try {
+    const decoded = jwtDecode(token);
+    const role = localStorage.getItem("role");
+    const email = localStorage.getItem("email");
+    const expiresAt = typeof decoded.exp === "number" ? decoded.exp * 1000 : null;
+
+    if (!role || !email || (expiresAt !== null && expiresAt <= Date.now())) {
       localStorage.clear();
       return null;
     }
-  });
+
+    return { token, role, email, decoded };
+  } catch {
+    localStorage.clear();
+    return null;
+  }
+}
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(getStoredUser);
 
   const login = (token, email, role) => {
     localStorage.setItem("token", token);

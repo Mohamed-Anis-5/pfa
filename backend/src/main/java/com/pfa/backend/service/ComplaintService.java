@@ -10,9 +10,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,6 +38,36 @@ public class ComplaintService {
     // -------------------------------------------------------
     @Transactional
     public ComplaintResponse createComplaint(ComplaintCreateRequest request, String citizenEmail) {
+                String normalizedTitle = normalizeText(request.getTitle());
+                String normalizedDescription = normalizeText(request.getDescription());
+                String normalizedStreetName = normalizeText(request.getStreetName());
+                boolean hasLatitude = request.getLatitude() != null;
+                boolean hasLongitude = request.getLongitude() != null;
+                boolean hasCoordinates = hasLatitude && hasLongitude;
+                boolean hasStreetName = normalizedStreetName != null;
+
+                if (normalizedTitle == null) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Title is required.");
+                }
+
+                if (normalizedDescription == null || normalizedDescription.length() < 10) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Description must contain at least 10 characters.");
+                }
+
+                if (request.getCategoryId() == null) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Complaint category is required.");
+                }
+
+                if (hasLatitude != hasLongitude) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Both latitude and longitude are required when using GPS coordinates.");
+                }
+
+                if (!hasCoordinates && !hasStreetName) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Location is required. Capture GPS coordinates or provide a street name.");
+                }
 
         // Resolve citizen from authenticated email
         Citizen citizen = citizenRepository.findByEmail(citizenEmail)
@@ -48,12 +81,13 @@ public class ComplaintService {
         LocalDate targetDate = LocalDate.now().plusDays(category.getSlaDays());
 
         Complaint complaint = Complaint.builder()
-                .title(request.getTitle())
-                .description(request.getDescription())
+                .title(normalizedTitle)
+                .description(normalizedDescription)
                 .status(ComplaintStatus.PENDING)
                 .priority(request.getPriority() != null ? request.getPriority() : Priority.Medium)
-                .latitude(request.getLatitude())
-                .longitude(request.getLongitude())
+                .latitude(hasCoordinates ? request.getLatitude() : null)
+                .longitude(hasCoordinates ? request.getLongitude() : null)
+                .streetName(hasStreetName ? normalizedStreetName : null)
                 .category(category)
                 .citizen(citizen)
                 .targetDate(targetDate)
@@ -72,6 +106,15 @@ public class ComplaintService {
 
         return toResponse(complaint);
     }
+
+        private String normalizeText(String value) {
+                if (value == null) {
+                        return null;
+                }
+
+                String trimmedValue = value.trim();
+                return trimmedValue.isEmpty() ? null : trimmedValue;
+        }
 
     // -------------------------------------------------------
     // 2.1 — Attach image to existing complaint
@@ -216,6 +259,7 @@ public class ComplaintService {
                 .priority(c.getPriority())
                 .latitude(c.getLatitude())
                 .longitude(c.getLongitude())
+                .streetName(c.getStreetName())
                 .categoryLabel(c.getCategory().getLabel())
                 .slaDays(c.getCategory().getSlaDays())
                 .targetDate(c.getTargetDate())
@@ -228,6 +272,34 @@ public class ComplaintService {
                 .resolutionComment(c.getResolutionComment())
                 .build();
     }
+
+        private PublicComplaintSummary toPublicSummary(Complaint complaint) {
+                return PublicComplaintSummary.builder()
+                                .complaintId(complaint.getComplaintId())
+                                .title(complaint.getTitle())
+                                .streetName(complaint.getStreetName())
+                                .categoryLabel(complaint.getCategory().getLabel())
+                                .status(complaint.getStatus())
+                                .priority(complaint.getPriority())
+                                .createdAt(complaint.getCreatedAt())
+                                .targetDate(complaint.getTargetDate())
+                                .build();
+        }
+
+        public PublicHomeSummaryResponse getPublicHomeSummary() {
+                ZoneId zoneId = ZoneId.systemDefault();
+                OffsetDateTime startOfToday = LocalDate.now(zoneId).atStartOfDay(zoneId).toOffsetDateTime();
+                OffsetDateTime startOfTomorrow = LocalDate.now(zoneId).plusDays(1).atStartOfDay(zoneId).toOffsetDateTime();
+
+                return PublicHomeSummaryResponse.builder()
+                                .complaintsToday(complaintRepository.countByCreatedAtBetween(startOfToday, startOfTomorrow))
+                                .totalComplaints(complaintRepository.count())
+                                .recentComplaints(complaintRepository.findTop5ByOrderByCreatedAtDesc()
+                                                .stream()
+                                                .map(this::toPublicSummary)
+                                                .toList())
+                                .build();
+        }
 
     public List<ComplaintResponse> getAllComplaints() {
     return complaintRepository.findAll().stream().map(this::toResponse).toList();
