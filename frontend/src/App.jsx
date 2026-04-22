@@ -10,12 +10,14 @@ import MyComplaints     from "./pages/citizen/MyComplaints";
 import AdminDashboard   from "./pages/admin/AdminDashboard";
 import Analytics        from "./pages/admin/Analytics";
 import AgentDashboard   from "./pages/agent/AgentDashboard";
+import PageMetadata     from "./components/shared/PageMetadata";
 import ProtectedRoute   from "./routes/ProtectedRoute";
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <PageMetadata />
         <Routes>
           {/* Public */}
           <Route path="/login"    element={<Login />} />
