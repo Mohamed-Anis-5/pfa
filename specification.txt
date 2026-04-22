@@ -1,0 +1,214 @@
+Specification Coverage Notes
+Date: 2026-04-22
+
+Legend
+- DONE: implemented in the current repository
+- PARTIAL: implemented in part, but does not fully match the specification
+- GAP: not implemented or no clear repository evidence found
+
+Overall
+- The core complaint lifecycle is mostly implemented end to end.
+- The main missing areas are offline submission, map-based fallback when GPS fails, full privacy/compliance coverage, HTTPS/TLS, multilingual support, and operational/performance requirements.
+- One important mismatch exists in the feedback workflow: after citizen feedback, the complaint becomes CLOSED in code, while the specification says it should become ARCHIVED.
+
+4.2 Functional Requirements
+
+UC-01 - Soumettre une reclamation
+Status: PARTIAL
+Done
+- Citizen authentication is required for complaint creation.
+- Title, category, and description are collected and validated.
+- Optional image upload is supported.
+- GPS capture is supported.
+- Street name fallback is supported when GPS is unavailable.
+- Complaint is created with status PENDING.
+- A UUID complaintId is generated and returned as the tracking identifier.
+Evidence
+- backend/src/main/java/com/pfa/backend/config/SecurityConfig.java
+- backend/src/main/java/com/pfa/backend/service/ComplaintService.java
+- frontend/src/pages/citizen/SubmitComplaint.jsx
+Gap
+- Offline mode with local save is not implemented.
+- No "En attente de synchronisation" workflow or status was found.
+- Automatic background synchronization after Internet recovery was not found.
+- Manual map selection when GPS fails was not found in the complaint submission flow.
+
+UC-02 - Assigner / Dispatcher une reclamation
+Status: DONE
+Done
+- Admin can assign a complaint to an agent.
+- Complaint status changes to ASSIGNED.
+- Assignment history is recorded.
+- A notification record is created for the assigned agent.
+Evidence
+- backend/src/main/java/com/pfa/backend/service/ComplaintService.java
+- backend/src/main/java/com/pfa/backend/config/SecurityConfig.java
+- frontend/src/pages/admin/AdminDashboard.jsx
+
+UC-03 - Traiter et mettre a jour une reclamation
+Status: DONE
+Done
+- Agent can move a complaint from ASSIGNED to IN_PROGRESS.
+- Agent can move a complaint from IN_PROGRESS to RESOLVED.
+- Agent can add a resolution comment.
+- Agent can upload an image as proof.
+- resolvedAt and updatedAt timestamps are recorded.
+- A notification record is created for the citizen when the complaint is resolved.
+Evidence
+- backend/src/main/java/com/pfa/backend/service/ComplaintService.java
+- backend/src/main/java/com/pfa/backend/controller/NotificationController.java
+- frontend/src/pages/agent/AgentDashboard.jsx
+
+UC-04 - Suivre et evaluer le service
+Status: PARTIAL
+Done
+- Citizen can see complaint history.
+- Citizen can open a resolved complaint and submit a rating from 1 to 5.
+- Optional feedback comment is supported.
+- Feedback is stored and duplicate feedback is blocked.
+Evidence
+- backend/src/main/java/com/pfa/backend/service/FeedbackService.java
+- backend/src/main/java/com/pfa/backend/controller/FeedbackController.java
+- frontend/src/pages/citizen/MyComplaints.jsx
+Gap
+- The specification says the complaint should become ARCHIVED after feedback.
+- The current code changes RESOLVED to CLOSED after feedback.
+- ARCHIVED is currently used by the SLA scheduler for overdue complaints, not by the feedback flow.
+
+5. Non-Functional Requirements
+
+5.1 Security and Privacy
+
+Authentication
+Status: DONE
+- JWT authentication is implemented for all roles.
+Evidence
+- backend/src/main/java/com/pfa/backend/config/SecurityConfig.java
+- backend/src/main/java/com/pfa/backend/util/JwtUtil.java
+
+Authorization (RBAC)
+Status: DONE
+- Role-based restrictions exist for admin assignment and agent status update endpoints.
+Evidence
+- backend/src/main/java/com/pfa/backend/config/SecurityConfig.java
+
+Password protection
+Status: DONE
+- Passwords are hashed with BCrypt.
+Evidence
+- backend/src/main/java/com/pfa/backend/config/SecurityConfig.java
+
+Encryption of sensitive data at rest
+Status: GAP
+- No clear evidence of AES-256 or equivalent encryption for personal data or geolocation data at rest was found.
+
+Protection in transit via HTTPS/TLS
+Status: GAP
+- No SSL/TLS configuration was found in backend application properties or configuration classes.
+
+Privacy compliance (access / modify / delete personal data)
+Status: PARTIAL
+Done
+- Users can delete/anonymize their own account.
+Evidence
+- backend/src/main/java/com/pfa/backend/controller/UserController.java
+Gap
+- No self-service endpoint was found to let users access all of their stored personal profile data.
+- No self-service endpoint was found to let users modify their account data.
+
+5.2 Performance and Scalability
+
+Response time under 2 seconds
+Status: GAP
+- No benchmark, monitoring target, or automated performance verification was found.
+
+At least 100 concurrent users
+Status: GAP
+- No load test suite or scalability target implementation was found.
+
+Server-side image compression
+Status: DONE
+- Uploaded images are compressed on the server with Thumbnailator before storage.
+Evidence
+- backend/src/main/java/com/pfa/backend/service/FileStorageService.java
+
+5.3 Availability and Reliability
+
+Availability target 99.5%
+Status: GAP
+- No uptime target, monitoring setup, or availability documentation was found.
+
+Data integrity / ACID
+Status: PARTIAL
+Done
+- The application uses transactional service methods and a relational database stack.
+Evidence
+- backend/src/main/java/com/pfa/backend/service/ComplaintService.java
+- backend/src/main/java/com/pfa/backend/service/FeedbackService.java
+Gap
+- No repository note or operational proof was found for ACID guarantees beyond the standard database/framework behavior.
+
+Backup and recovery
+Status: GAP
+- No backup procedure, restore process, or disaster recovery note was found.
+
+User-friendly error handling
+Status: DONE
+- Backend returns structured errors and the frontend surfaces readable messages.
+Evidence
+- backend/src/main/java/com/pfa/backend/exception/GlobalExceptionHandler.java
+- frontend/src/pages/citizen/SubmitComplaint.jsx
+
+5.4 Usability (UX/UI)
+
+Accessibility / WCAG
+Status: PARTIAL
+Done
+- The frontend includes some accessibility support such as labels, alerts, aria-live, and accessible rating controls.
+Evidence
+- frontend/src/pages/citizen/SubmitComplaint.jsx
+- frontend/src/components/shared/StarRating.jsx
+Gap
+- No evidence of WCAG compliance testing or a broader accessibility standard implementation was found.
+
+Responsive design
+Status: DONE
+- The frontend uses responsive layouts across major pages.
+Evidence
+- frontend/src/pages/home/Home.jsx
+- frontend/src/pages/citizen/MyComplaints.jsx
+- frontend/src/pages/admin/AdminDashboard.jsx
+
+Multilingual support
+Status: GAP
+- No i18n library, translation files, or language switcher was found.
+- The frontend currently uses a single language setup.
+Evidence
+- frontend/index.html
+
+5.5 Maintainability
+
+Modularity
+Status: DONE
+- The project is separated into backend and frontend, with controllers, services, repositories, DTOs, and reusable components.
+
+Code quality and documentation
+Status: DONE
+- The repository contains updated backend and frontend README files.
+- OpenAPI / Swagger support is configured.
+Evidence
+- backend/README.md
+- frontend/README.md
+- backend/src/main/java/com/pfa/backend/config/OpenApiConfig.java
+
+Extensibility
+Status: DONE
+- The architecture is modular enough to support future features with moderate extension effort.
+
+Priority Gaps To Address Next
+1. Implement offline complaint submission with local persistence and sync.
+2. Add map-based manual location selection when GPS capture fails.
+3. Align the feedback workflow with the specification if ARCHIVED is the required post-feedback state.
+4. Add HTTPS/TLS and review data protection for sensitive fields beyond password hashing.
+5. Add multilingual support.
+6. Define and validate performance, availability, backup, and recovery requirements.
